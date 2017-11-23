@@ -210,9 +210,97 @@ contract Snowballs is ERC20Token, HasEngine {
 }
 
 
-//contract SnowballsUserbase is HasEngine{
-//
-//    function SnowballsUserbase(address _owner, address engine){
-//
-//    }
-//}
+contract SnowballUserbase is HasEngine{
+
+    struct user{
+        string name;
+        uint8 experience;
+        uint256 lastHit;
+        uint256 hitsTaken;
+        uint256 hitsGiven;
+        mapping(uint8 => uint256) hitBy;
+    }
+
+    uint256 public nUsers;
+
+    mapping(uint256 => user) private users;
+
+    mapping(address => uint256) private userIds;
+
+    mapping(string => bool) private usernamesTaken;
+
+
+
+    function hitBy(uint256 _id, uint8 _level) public constant returns(uint256) {
+        return users[_id].hitBy[_level];
+    }
+
+    function getUserID(address _user) public constant returns (uint256){
+        return userIds[_user];
+    }
+
+
+    function usernameTaken(string _name) public constant returns (bool){
+        return usernamesTaken[_name];
+    }
+
+    function setUsername(string _name){
+        require(!usernameTaken(_name));
+        uint256 userId = userIds[msg.sender];
+
+        // must be existing user;
+        require(userId > 0);
+        // username cannot be changed
+        require(bytes(users[userId].name).length == 0);
+
+        usernamesTaken[_name] = true;
+        users[userId].name = _name;
+    }
+
+    function newUser(address _user) public{
+        require(msg.sender == engine);
+        uint256 _userId = userIds[_user];
+        // user needs to be new!
+        require(_userId == 0);
+
+        // ad new user
+        nUsers += 1;
+
+        userIds[_user] = nUsers;
+        users[nUsers].lastHit = now;
+
+    }
+
+    function levelUp(uint256 _id) public{
+        require(msg.sender == engine);
+        users[_id].experience += 1;
+    }
+
+}
+
+
+contract Engie is TakesDonations{
+
+    address balls;
+    addrres base;
+
+    function throwBall(address _enemy){
+        Snowballs snowballs = Snowballs(balls);
+        SnowballUserbase userbase = SnowballUserbase(base);
+
+        uint256 enemyId = userbase.getUserId(_enemy);
+        uint256 userId = userbase.getUserId(msg.sender);
+
+        require(allowedToThrow(userId));
+        require(snowballs.throwBall(msg.sender, _enemy));
+
+        assert(userId > 0)
+
+        if (enemyId == 0){
+            userbase.newUser(_enemy);
+        } else {
+
+        }
+
+    }
+}
