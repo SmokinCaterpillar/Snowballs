@@ -214,11 +214,11 @@ contract SnowballUserbase is HasEngine{
 
     struct user{
         string name;
-        uint8 experience;
+        uint16 experience;
         uint256 lastHit;
         uint256 hitsTaken;
         uint256 hitsGiven;
-        mapping(uint8 => uint256) hitBy;
+        uint256 lastHitBy;
     }
 
     uint256 public nUsers;
@@ -227,38 +227,53 @@ contract SnowballUserbase is HasEngine{
 
     mapping(address => uint256) private userIds;
 
-    mapping(string => bool) private usernamesTaken;
+    mapping(string => address) private usernames;
 
-
-
-    function hitBy(uint256 _id, uint8 _level) public constant returns(uint256) {
-        return users[_id].hitBy[_level];
-    }
-
-    function getUserID(address _user) public constant returns (uint256){
+    function getUserId(address _user) public constant returns (uint256){
         return userIds[_user];
     }
 
-
-    function usernameTaken(string _name) public constant returns (bool){
-        return usernamesTaken[_name];
+    function getAddressByUsername(string _name) public constant returns (address){
+        return usernames[_name];
     }
 
+    function getLastHit(uint256 _id) public constant returns (uint256){
+        return users[_id].lastHit;
+    }
+
+    function getLastHitBy(uint256 _id) public constant returns (uint256){
+        return users[_id].lastHitBy;
+    }
+
+    function getUserExp(uint256 _id) public constant returns (uint16){
+        return users[_id].experience;
+    }
+
+    function getHitsTaken(uint256 _id) public constant returns (uint256){
+        return users[_id].hitsTaken;
+    }
+
+    function getHitsGiven(uint256 _id) public constant returns (uint256){
+        return users[_id].hitsGiven;
+    }
+
+
     function setUsername(string _name){
-        require(!usernameTaken(_name));
+        // username must be unique and should not be taken
+        require(getAddressByUsername(_name) == address(0));
         uint256 userId = userIds[msg.sender];
 
         // must be existing user;
         require(userId > 0);
-        // username cannot be changed
-        require(bytes(users[userId].name).length == 0);
 
-        usernamesTaken[_name] = true;
+        // store username setting
         users[userId].name = _name;
+        usernames[_name] = msg.sender;
     }
 
-    function newUser(address _user) public{
+    function addNewUser(address _user) public{
         require(msg.sender == engine);
+
         uint256 _userId = userIds[_user];
         // user needs to be new!
         require(_userId == 0);
@@ -266,41 +281,115 @@ contract SnowballUserbase is HasEngine{
         // ad new user
         nUsers += 1;
 
+        // add user to user ids
         userIds[_user] = nUsers;
-        users[nUsers].lastHit = now;
-
     }
 
-    function levelUp(uint256 _id) public{
+    function addHit(uint256 _by, uint256 _to) {
         require(msg.sender == engine);
-        users[_id].experience += 1;
+        users[_to].lastHitBy = _by;
+        users[_to].lastHit = now;
+        users[_to].hitsTaken += 1;
+        users[_by].hitsGiven += 1;
+    }
+
+    function setExp(uint256 _id, uint16 _exp) public{
+        require(msg.sender == engine);
+        users[_id].experience = _exp;
+    }
+
+    function resetHitBy(uint256 _id) public{
+        require(msg.sender == engine);
+        users[_id].lastHitBy = 0;
+        users[_id].lastHit = 0;
     }
 
 }
 
 
-contract Engie is TakesDonations{
+contract SnowballRules{
+
+    uint16 public constant maxLevel = 9;
+    uint16 public constant expPerLevel = 3;
+
+    function getLevel(uint16 experience) public constant returns(uint16){
+        return experience / expPerLevel;
+    }
+
+    function allowedToThrow(uint256 _lastHit) public returns(bool){
+        return true;
+    }
+
+}
+
+
+contract SnowballEngine is TakesDonations{
 
     address balls;
-    addrres base;
+    address base;
+    address rules;
 
-    function throwBall(address _enemy){
+
+
+    function throwBall(address _enemy) public payable{
         Snowballs snowballs = Snowballs(balls);
         SnowballUserbase userbase = SnowballUserbase(base);
+        SnowballRules snowrules = SnowballRules(rules);
 
         uint256 enemyId = userbase.getUserId(_enemy);
         uint256 userId = userbase.getUserId(msg.sender);
+        uint256 enemyHityById = 0;
+        uint256 userLastHit = userbase.getLastHit(userId);
 
-        require(allowedToThrow(userId));
-        require(snowballs.throwBall(msg.sender, _enemy));
+        uint16 enemyLevel = 0;
+        uint16 enemyExp = 0;
+        uint16 userLevel = 0;
+        uint16 userExp = 0;
 
-        assert(userId > 0)
-
-        if (enemyId == 0){
-            userbase.newUser(_enemy);
-        } else {
-
+        // user got some snow via transfer and throws for the first time
+        if (userId == 0){
+            userbase.addNewUser(msg.sender);
+        } else{
+            userExp = userbase.getUserExp(userId);
+            userLevel = snowrules.getLevel(userExp);
         }
 
+        require(snowrules.allowedToThrow(userLastHit));
+        require(snowballs.throwBall(msg.sender, _enemy));
+
+        if (enemyId == 0){
+            userbase.addNewUser(_enemy);
+        } else {
+            enemyExp = userbase.getUserExp(enemyId);
+            enemyLevel = snowrules.getLevel(enemyExp);
+            enemyHityById = userbase.getLastHitBy(enemyId);
+        }
+
+        // check if ball throwing actually has an effect
+        if (enemyLevel < snowrules.maxLevel() && enemyLevel <= userLevel){
+            // throw counts
+            userbase.addHit(userId, enemyId);
+
+            if (enemyLevel == userLevel && enemyHityById == 0){
+                gatherExperience(userId, userExp, userLevel);
+            }
+        }
     }
+
+    function gatherExperience(uint256 userId,
+                              uint16 userExp,
+                              uint16 userLevel) internal {
+        SnowballUserbase userbase = SnowballUserbase(base);
+        SnowballRules snowrules = SnowballRules(rules);
+
+        uint16 newExp = userExp += 1;
+        uint16 newLevel = snowrules.getLevel(newExp);
+
+        userbase.setExp(userId, newExp);
+
+        if (newLevel > userLevel){
+            userbase.resetHitBy(userId);
+        }
+    }
+
 }
