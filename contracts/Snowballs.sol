@@ -419,6 +419,7 @@ contract SnowballRules is HasEngine{
     mapping (uint16 => uint256) public level2balls;
     mapping (uint16 => uint256) public level2gold;
     mapping (uint16 => uint256) public level2time;
+    mapping (uint16 => string) public level2rank;
 
     function setBallsPerLevel() private{
         level2balls[0] = 2;
@@ -454,6 +455,19 @@ contract SnowballRules is HasEngine{
         level2time[6] = 24 hours;
         level2time[7] = 20 hours;
         level2time[8] = 16 hours;
+    }
+
+    function setLevelNames() private{
+        level2rank[0] = 'Snow White';
+        level2rank[1] = 'Snow Cadet';
+        level2rank[2] = 'Snow Officer';
+        level2rank[3] = 'Snow Lieutenant';
+        level2rank[4] = 'Snow Commander';
+        level2rank[5] = 'Snow Captain';
+        level2rank[6] = 'Snow General';
+        level2rank[7] = 'Snow High Priest';
+        level2rank[8] = 'Snow Demigod';
+        level2rank[9] = 'Snow God';
     }
 
     function getLevel(uint16 _experience) public constant returns(uint16){
