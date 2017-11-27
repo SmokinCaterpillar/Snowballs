@@ -162,7 +162,87 @@ contract HasEngine is TakesDonations{
 }
 
 
-contract Snowballs is ERC20Token, HasEngine {
+contract MintableToken is ERC20Token {
+    // total supply of tokens
+    // increased with every tap
+    uint256 internal internalSupply;
+
+    function totalSupply() public constant returns (uint256){
+        return internalSupply;
+    }
+
+    function mint(address _beneficiary, uint256 _amount) internal{
+        // check for wrap aroung
+        require(balances[_beneficiary] + _amount > balances[_beneficiary]);
+        require(internalSupply + _amount > internalSupply);
+
+        // roll the new balls
+        internalSupply += _amount;
+        balances[_beneficiary] += _amount;
+    }
+
+}
+
+
+contract SnowGold is MintableToken, HasEngine {
+    // Token symbol
+    string public symbol = 'SGC';
+
+    // Name of token
+    string public name = 'Snow Gold';
+
+    // Gold = BTC
+    uint8 public decimals = 8;
+
+    uint256 public unit = 100000000;
+
+    function SnowGold(address _owner, address _engine)
+        HasEngine(_owner, _engine){
+        // dev supply
+        internalSupply = 9999 * unit;
+        balances[owner] = internalSupply;
+        Transfer(this, owner, internalSupply);
+    }
+
+    function mintBars(address _to, uint256 _amount){
+        // this can only be triggered by the game
+        require(msg.sender == engine);
+
+        mint(_to, _amount * unit);
+
+    }
+}
+
+
+contract SnowGodMedals is MintableToken, HasEngine {
+    // Token symbol
+    string public symbol = 'GOD';
+
+    // Name of token
+    string public name = 'Snow God Medals';
+
+    // Gold = BTC
+    uint8 public decimals = 0;
+
+    function SnowGodMedals(address _owner, address _engine)
+        HasEngine(_owner, _engine){
+        // dev supply
+        internalSupply = 9;
+        balances[owner] = internalSupply;
+        Transfer(this, owner, internalSupply);
+    }
+
+    function mintMedal(address _to){
+        // this can only be triggered by the game
+        require(msg.sender == engine);
+
+        mint(_to, 1);
+
+    }
+}
+
+
+contract Snowballs is MintableToken, HasEngine {
     // Token symbol
     string public symbol = 'SNOW';
 
@@ -172,20 +252,13 @@ contract Snowballs is ERC20Token, HasEngine {
     // Snowballs cannot be divided
     uint8 public decimals = 0;
 
-    // total supply of tokens
-    // increased with every tap
-    uint256 private internalSupply;
 
     function Snowballs(address _owner, address _engine)
         HasEngine(_owner, _engine){
         // dev supply
-        internalSupply = 42000;
+        internalSupply = 99999;
         balances[owner] = internalSupply;
         Transfer(this, owner, internalSupply);
-    }
-
-    function totalSupply() public constant returns (uint256){
-        return internalSupply;
     }
 
     function throwBall(address _from, address _to) public returns(bool){
@@ -198,13 +271,8 @@ contract Snowballs is ERC20Token, HasEngine {
         // this can only be triggered by the game
         require(msg.sender == engine);
 
-        // check for wrap aroung
-        require(balances[_to] + _amount > balances[_to]);
-        require(internalSupply + _amount > internalSupply);
+        mint(_to, _amount);
 
-        // roll the new balls
-        internalSupply += _amount;
-        balances[_to] += _amount;
     }
 
 }
@@ -214,6 +282,7 @@ contract SnowballUserbase is HasEngine{
 
     struct user{
         string name;
+        address useraddress;
         uint16 experience;
         uint256 lastHit;
         uint256 hitsTaken;
@@ -221,20 +290,35 @@ contract SnowballUserbase is HasEngine{
         uint256 lastHitBy;
     }
 
+    struct hit{
+        uint256 userId;
+        uint256 enemyId;
+    }
+
+    uint256 totalHits;
+
     uint256 public nUsers;
+
+    uint256 public usernamePrice = 9 finney;
 
     mapping(uint256 => user) private users;
 
     mapping(address => uint256) private userIds;
 
-    mapping(string => address) private usernames;
+    mapping(string => uint256) private usernames;
+
+    mapping(uint256 => hit) private hitLog;
 
     function getUserId(address _user) public constant returns (uint256){
         return userIds[_user];
     }
 
+    function getUserAdressById(uint256 _id) public constant returns(address){
+        return users[_id].useraddress;
+    }
+
     function getAddressByUsername(string _name) public constant returns (address){
-        return usernames[_name];
+        return getUserAdressById(usernames[_name]);
     }
 
     function getLastHit(uint256 _id) public constant returns (uint256){
@@ -257,8 +341,20 @@ contract SnowballUserbase is HasEngine{
         return users[_id].hitsGiven;
     }
 
+    function getHitLogEntry(uint256 _entry) public constant returns(uint256, uint256){
+        return (hitLog[_entry].userId, hitLog[_entry].enemyId);
+    }
 
-    function setUsername(string _name){
+    function setUsernamePrice(uint256 _amount) public{
+        require(msg.sender == owner);
+        usernamePrice = _amount;
+    }
+
+
+    function setUsername(string _name) public payable{
+        // username costs some price
+
+        require(msg.value >= usernamePrice);
         // username must be unique and should not be taken
         require(getAddressByUsername(_name) == address(0));
         uint256 userId = userIds[msg.sender];
@@ -268,7 +364,7 @@ contract SnowballUserbase is HasEngine{
 
         // store username setting
         users[userId].name = _name;
-        usernames[_name] = msg.sender;
+        usernames[_name] = userId;
     }
 
     function addNewUser(address _user) public{
@@ -283,6 +379,7 @@ contract SnowballUserbase is HasEngine{
 
         // add user to user ids
         userIds[_user] = nUsers;
+        users[nUsers].useraddress = _user;
     }
 
     function addHit(uint256 _by, uint256 _to) {
@@ -291,6 +388,11 @@ contract SnowballUserbase is HasEngine{
         users[_to].lastHit = now;
         users[_to].hitsTaken += 1;
         users[_by].hitsGiven += 1;
+
+        totalHits += 1;
+
+        hitLog[totalHits].userId = _by;
+        hitLog[totalHits].enemyId = _to;
     }
 
     function setExp(uint256 _id, uint16 _exp) public{
@@ -307,17 +409,64 @@ contract SnowballUserbase is HasEngine{
 }
 
 
-contract SnowballRules{
+contract SnowballRules is HasEngine{
 
     uint16 public constant maxLevel = 9;
     uint16 public constant expPerLevel = 3;
 
-    function getLevel(uint16 experience) public constant returns(uint16){
-        return experience / expPerLevel;
+    bool public gameActive = true;
+
+    mapping (uint16 => uint256) public level2balls;
+    mapping (uint16 => uint256) public level2gold;
+    mapping (uint16 => uint256) public level2time;
+
+    function setBallsPerLevel() private{
+        level2balls[0] = 2;
+        level2balls[1] = 4;
+        level2balls[2] = 8;
+        level2balls[3] = 16;
+        level2balls[4] = 32;
+        level2balls[5] = 64;
+        level2balls[6] = 128;
+        level2balls[7] = 256;
+        level2balls[8] = 512;
+        level2balls[9] = 2048;
     }
 
-    function allowedToThrow(uint256 _lastHit) public returns(bool){
-        return true;
+    function setGoldPerLevelUp() private{
+        level2gold[2] = 1;
+        level2gold[3] = 2;
+        level2gold[4] = 4;
+        level2gold[5] = 8;
+        level2gold[6] = 16;
+        level2gold[7] = 32;
+        level2gold[8] = 64;
+        level2gold[9] = 293;
+    }
+
+    function setWaitingTimePerLevel() private{
+        level2time[0] = 48 hours;
+        level2time[1] = 44 hours;
+        level2time[2] = 40 hours;
+        level2time[3] = 36 hours;
+        level2time[4] = 32 hours;
+        level2time[5] = 28 hours;
+        level2time[6] = 24 hours;
+        level2time[7] = 20 hours;
+        level2time[8] = 16 hours;
+    }
+
+    function getLevel(uint16 _experience) public constant returns(uint16){
+        return _experience / expPerLevel;
+    }
+
+    function allowedToThrow(uint16 _level, uint256 _lastHit) public returns(bool){
+        return gameActive && (now > _lastHit + level2time[_level]);
+    }
+
+    function setGameState(bool _state) public{
+        require(msg.sender == owner);
+        gameActive = _state;
     }
 
 }
@@ -326,10 +475,10 @@ contract SnowballRules{
 contract SnowballEngine is TakesDonations{
 
     address balls;
+    address gold;
+    address medals;
     address base;
     address rules;
-
-
 
     function throwBall(address _enemy) public payable{
         Snowballs snowballs = Snowballs(balls);
@@ -354,7 +503,7 @@ contract SnowballEngine is TakesDonations{
             userLevel = snowrules.getLevel(userExp);
         }
 
-        require(snowrules.allowedToThrow(userLastHit));
+        require(snowrules.allowedToThrow(userLevel, userLastHit));
         require(snowballs.throwBall(msg.sender, _enemy));
 
         if (enemyId == 0){
@@ -368,6 +517,7 @@ contract SnowballEngine is TakesDonations{
         // check if ball throwing actually has an effect
         if (enemyLevel < snowrules.maxLevel() && enemyLevel <= userLevel){
             // throw counts
+            Hit(msg.sender, _enemy);
             userbase.addHit(userId, enemyId);
 
             if (enemyLevel == userLevel && enemyHityById == 0){
@@ -376,20 +526,53 @@ contract SnowballEngine is TakesDonations{
         }
     }
 
-    function gatherExperience(uint256 userId,
-                              uint16 userExp,
-                              uint16 userLevel) internal {
+    function gatherExperience(uint256 _userId,
+                              uint16 _userExp,
+                              uint16 _userLevel) internal {
         SnowballUserbase userbase = SnowballUserbase(base);
         SnowballRules snowrules = SnowballRules(rules);
+        Snowballs snowballs = Snowballs(balls);
 
-        uint16 newExp = userExp += 1;
+        assert(_userLevel < snowrules.maxLevel());
+
+        uint16 newExp = _userExp += 1;
         uint16 newLevel = snowrules.getLevel(newExp);
+        uint256 newBalls = snowrules.level2balls(_userLevel);
 
-        userbase.setExp(userId, newExp);
+        snowballs.rollBalls(msg.sender, newBalls);
+        userbase.setExp(_userId, newExp);
 
-        if (newLevel > userLevel){
-            userbase.resetHitBy(userId);
+        Experience(msg.sender);
+
+        if (newLevel > _userLevel){
+            SnowGold snowGold = SnowGold(gold);
+            uint256 gold = snowrules.level2gold(newLevel);
+            snowGold.mintBars(msg.sender, gold);
+
+            userbase.resetHitBy(_userId);
+
+            LevelUp(msg.sender);
+
+            if (newLevel == snowrules.maxLevel()){
+                SnowGodMedals snowMedals = SnowGodMedals(medals);
+                snowMedals.mintMedal(msg.sender);
+
+                newBalls = snowrules.level2balls(newLevel);
+                snowballs.rollBalls(msg.sender, newBalls);
+
+                BecameGod(msg.sender);
+            }
         }
     }
+
+     // Triggered when tokens are transferred.
+    event Hit(address indexed _from, address indexed _to);
+
+    // Triggered whenever approve(address _spender, uint256 _value) is called.
+    event Experience(address indexed _user);
+
+    event LevelUp(address indexed _user);
+
+    event BecameGod(address indexed _user);
 
 }
