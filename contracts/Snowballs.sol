@@ -199,7 +199,7 @@ contract SnowGold is MintableToken, HasEngine {
     function SnowGold(address _owner, address _engine)
         HasEngine(_owner, _engine){
         // dev supply
-        internalSupply = 9999 * unit;
+        internalSupply = 33333 * unit;
         balances[owner] = internalSupply;
         Transfer(this, owner, internalSupply);
     }
@@ -227,7 +227,7 @@ contract SnowGodMedals is MintableToken, HasEngine {
     function SnowGodMedals(address _owner, address _engine)
         HasEngine(_owner, _engine){
         // dev supply
-        internalSupply = 9;
+        internalSupply = 42;
         balances[owner] = internalSupply;
         Transfer(this, owner, internalSupply);
     }
@@ -257,8 +257,8 @@ contract Snowballs is MintableToken, HasEngine {
         HasEngine(_owner, _engine){
         // dev supply
         internalSupply = 99999;
-        balances[owner] = internalSupply;
-        Transfer(this, owner, internalSupply);
+        balances[_owner] = internalSupply;
+        Transfer(this, _owner, internalSupply);
     }
 
     function throwBall(address _from, address _to) public returns(bool){
@@ -299,7 +299,7 @@ contract SnowballUserbase is HasEngine{
 
     uint256 public nUsers;
 
-    uint256 public usernamePrice = 9 finney;
+    uint256 public usernamePrice = 0;
 
     mapping(uint256 => user) private users;
 
@@ -308,6 +308,8 @@ contract SnowballUserbase is HasEngine{
     mapping(string => uint256) private usernames;
 
     mapping(uint256 => hit) private hitLog;
+
+    mapping(uint16 => uint256) private experienceLog;
 
     function getUserId(address _user) public constant returns (uint256){
         return userIds[_user];
@@ -345,6 +347,10 @@ contract SnowballUserbase is HasEngine{
         return (hitLog[_entry].userId, hitLog[_entry].enemyId);
     }
 
+    function getExperiencLogEntry(uint16 _entry) public constant returns(uint256){
+        return experienceLog[_entry];
+    }
+
     function setUsernamePrice(uint256 _amount) public{
         require(msg.sender == owner);
         usernamePrice = _amount;
@@ -377,6 +383,9 @@ contract SnowballUserbase is HasEngine{
         // ad new user
         nUsers += 1;
 
+        // count experiences
+        experienceLog[0] += 1;
+
         // add user to user ids
         userIds[_user] = nUsers;
         users[nUsers].useraddress = _user;
@@ -397,7 +406,10 @@ contract SnowballUserbase is HasEngine{
 
     function setExp(uint256 _id, uint16 _exp) public{
         require(msg.sender == engine);
+        uint16 oldExp = users[_id].experience;
+        experienceLog[oldExp] -= 1;
         users[_id].experience = _exp;
+        experienceLog[_exp] += 1;
     }
 
     function resetHitBy(uint256 _id) public{
@@ -468,6 +480,11 @@ contract SnowballRules is HasEngine{
         level2rank[7] = 'Snow High Priest';
         level2rank[8] = 'Snow Demigod';
         level2rank[9] = 'Snow God';
+    }
+
+    function setLevelName(uint16 _level, string _name) public {
+        require(msg.sender == owner);
+        level2rank[_level] = _name;
     }
 
     function getLevel(uint16 _experience) public constant returns(uint16){
