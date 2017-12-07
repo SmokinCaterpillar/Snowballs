@@ -4,7 +4,7 @@
 * 0x10E44C6bc685c4E4eABda326c211561d5367EEec
 */
 
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.19;
 
 // ERC Token standard #20 Interface
 // https://github.com/ethereum/EIPs/issues/20
@@ -120,48 +120,6 @@ contract ERC20Token is ERC20Interface{
 }
 
 
-contract TakesDonations{
-
-    address private beneficiary;
-
-    function TakesDonations(address _beneficiary){
-        beneficiary = _beneficiary;
-    }
-
-    function withdraw() public{
-        // send donations to owner
-        require(msg.sender == beneficiary);
-        beneficiary.transfer(this.balance);
-    }
-
-    function () public payable{
-        // just take donations
-    }
-
-}
-
-
-contract HasEngine is TakesDonations{
-
-    // address of game enigne, i.e. game rules
-    address public engine;
-
-    address public owner;
-
-    function HasEngine(address _owner, address _engine)
-        TakesDonations(_owner){
-        owner = _owner;
-        engine = _engine;
-    }
-
-    // Can update or change the game Engine
-    function changeEngine(address _engine) public{
-        require(msg.sender == owner);
-        engine = _engine;
-    }
-}
-
-
 contract MintableToken is ERC20Token {
     // total supply of tokens
     // increased with every tap
@@ -184,7 +142,55 @@ contract MintableToken is ERC20Token {
 }
 
 
+contract TakesDonations{
+
+    address public owner;
+
+    function TakesDonations(){
+        owner = msg.sender;
+    }
+
+    function withdraw() public{
+        // send donations to owner
+        require(msg.sender == owner);
+        owner.transfer(this.balance);
+    }
+
+    function changeOwnership(address _owner) public{
+        require(msg.sender == owner);
+        owner = _owner;
+    }
+
+    function () public payable{
+        // just take donations
+    }
+
+}
+
+
+contract HasEngine is TakesDonations{
+
+    // address of game enigne, i.e. game rules
+    address public engine;
+
+    function HasEngine(address _engine){
+        engine = _engine;
+    }
+
+    // Can update or change the game Engine
+    function changeEngine(address _engine) public{
+        require(msg.sender == owner);
+        engine = _engine;
+    }
+}
+
+
+
+
+
 contract SnowGold is MintableToken, HasEngine {
+    string public constant version = '0.1.0';
+
     // Token symbol
     string public symbol = 'SGC';
 
@@ -196,8 +202,8 @@ contract SnowGold is MintableToken, HasEngine {
 
     uint256 public unit = 100000000;
 
-    function SnowGold(address _owner, address _engine)
-        HasEngine(_owner, _engine){
+    function SnowGold(address _engine)
+        HasEngine(_engine){
         // dev supply
         internalSupply = 33333 * unit;
         balances[owner] = internalSupply;
@@ -215,6 +221,9 @@ contract SnowGold is MintableToken, HasEngine {
 
 
 contract SnowGodMedals is MintableToken, HasEngine {
+
+    string public constant version = '0.1';
+
     // Token symbol
     string public symbol = 'GOD';
 
@@ -224,8 +233,8 @@ contract SnowGodMedals is MintableToken, HasEngine {
     // Gold = BTC
     uint8 public decimals = 0;
 
-    function SnowGodMedals(address _owner, address _engine)
-        HasEngine(_owner, _engine){
+    function SnowGodMedals(address _engine)
+        HasEngine(_engine){
         // dev supply
         internalSupply = 42;
         balances[owner] = internalSupply;
@@ -243,6 +252,9 @@ contract SnowGodMedals is MintableToken, HasEngine {
 
 
 contract Snowballs is MintableToken, HasEngine {
+
+    string public constant version = '0.1';
+
     // Token symbol
     string public symbol = 'SNOW';
 
@@ -253,12 +265,12 @@ contract Snowballs is MintableToken, HasEngine {
     uint8 public decimals = 0;
 
 
-    function Snowballs(address _owner, address _engine)
-        HasEngine(_owner, _engine){
+    function Snowballs(address _engine)
+        HasEngine( _engine){
         // dev supply
         internalSupply = 99999;
-        balances[_owner] = internalSupply;
-        Transfer(this, _owner, internalSupply);
+        balances[owner] = internalSupply;
+        Transfer(this, owner, internalSupply);
     }
 
     function throwBall(address _from, address _to) public returns(bool){
@@ -280,7 +292,9 @@ contract Snowballs is MintableToken, HasEngine {
 
 contract SnowballUserbase is HasEngine{
 
-    struct user{
+    string public constant version = '0.1';
+
+    struct User{
         string name;
         address useraddress;
         uint16 experience;
@@ -295,13 +309,18 @@ contract SnowballUserbase is HasEngine{
         uint256 enemyId;
     }
 
-    uint256 totalHits;
+    function SnowballUserbase(address _engine)
+        HasEngine(_engine){
+
+    }
+
+    uint256 public totalHits;
 
     uint256 public nUsers;
 
     uint256 public usernamePrice = 0;
 
-    mapping(uint256 => user) private users;
+    mapping(uint256 => User) private users;
 
     mapping(address => uint256) private userIds;
 
@@ -388,7 +407,16 @@ contract SnowballUserbase is HasEngine{
 
         // add user to user ids
         userIds[_user] = nUsers;
-        users[nUsers].useraddress = _user;
+        User memory newUser = User({
+            name: '',
+            useraddress: _user,
+            experience: 0,
+            lastHit: 0,
+            hitsTaken: 0,
+            hitsGiven: 0,
+            lastHitBy: 0
+        });
+        users[nUsers] = newUser;
     }
 
     function addHit(uint256 _by, uint256 _to) {
@@ -423,8 +451,10 @@ contract SnowballUserbase is HasEngine{
 
 contract SnowballRules is HasEngine{
 
-    uint16 public constant maxLevel = 9;
-    uint16 public constant expPerLevel = 3;
+    string public constant version = '0.1';
+
+    uint16 public maxLevel = 9;
+    uint16 public expPerLevel = 3;
 
     bool public gameActive = true;
 
@@ -432,6 +462,15 @@ contract SnowballRules is HasEngine{
     mapping (uint16 => uint256) public level2gold;
     mapping (uint16 => uint256) public level2time;
     mapping (uint16 => string) public level2rank;
+
+    function SnowballRules(address _engine)
+        HasEngine(_engine){
+        setBallsPerLevel();
+        setGoldPerLevelUp();
+        setWaitingTimePerLevel();
+        setLevelNames();
+
+    }
 
     function setBallsPerLevel() private{
         level2balls[0] = 2;
@@ -459,14 +498,14 @@ contract SnowballRules is HasEngine{
 
     function setWaitingTimePerLevel() private{
         level2time[0] = 48 hours;
-        level2time[1] = 44 hours;
-        level2time[2] = 40 hours;
-        level2time[3] = 36 hours;
-        level2time[4] = 32 hours;
-        level2time[5] = 28 hours;
-        level2time[6] = 24 hours;
-        level2time[7] = 20 hours;
-        level2time[8] = 16 hours;
+        level2time[1] = 40 hours;
+        level2time[2] = 36 hours;
+        level2time[3] = 32 hours;
+        level2time[4] = 28 hours;
+        level2time[5] = 24 hours;
+        level2time[6] = 20 hours;
+        level2time[7] = 16 hours;
+        level2time[8] = 12 hours;
     }
 
     function setLevelNames() private{
@@ -482,11 +521,6 @@ contract SnowballRules is HasEngine{
         level2rank[9] = 'Snow God';
     }
 
-    function setLevelName(uint16 _level, string _name) public {
-        require(msg.sender == owner);
-        level2rank[_level] = _name;
-    }
-
     function getLevel(uint16 _experience) public constant returns(uint16){
         return _experience / expPerLevel;
     }
@@ -500,18 +534,65 @@ contract SnowballRules is HasEngine{
         gameActive = _state;
     }
 
+    function setMaxLevel(uint16 _level) public {
+        require(msg.sender == owner);
+        maxLevel = _level;
+    }
+
+    function setExpPerLevel(uint16 _exp) public {
+        require(msg.sender == owner);
+        expPerLevel = _exp;
+    }
+
+    function setLevelName(uint16 _level, string _name) public {
+        require(msg.sender == owner);
+        level2rank[_level] = _name;
+    }
+
+    function setLevelWaitingTime(uint16 _level, uint256 _time) public {
+        require(msg.sender == owner);
+        level2time[_level] = _time;
+    }
+
+    function setLevelUpGold(uint16 _level, uint256 _gold) public {
+        require(msg.sender == owner);
+        level2gold[_level] = _gold;
+    }
+
+    function setLevelBalls(uint16 _level, uint256 _balls) public {
+        require(msg.sender == owner);
+        level2balls[_level] = _balls;
+    }
+
 }
 
 
 contract SnowballEngine is TakesDonations{
 
-    address balls;
-    address gold;
-    address medals;
-    address base;
-    address rules;
+    string public constant version = '0.1';
+
+    address public balls;
+    address public gold;
+    address public medals;
+    address public base;
+    address public rules;
+
+    function setDependencies(address _balls,
+                            address _gold,
+                            address _medals,
+                            address _base,
+                            address _rules) public{
+        require(msg.sender == owner);
+        balls = _balls;
+        gold = _gold;
+        medals = _medals;
+        base = _base;
+        rules = _rules;
+    }
 
     function throwBall(address _enemy) public payable{
+        require(_enemy != msg.sender);
+
         Snowballs snowballs = Snowballs(balls);
         SnowballUserbase userbase = SnowballUserbase(base);
         SnowballRules snowrules = SnowballRules(rules);
@@ -577,8 +658,8 @@ contract SnowballEngine is TakesDonations{
 
         if (newLevel > _userLevel){
             SnowGold snowGold = SnowGold(gold);
-            uint256 gold = snowrules.level2gold(newLevel);
-            snowGold.mintBars(msg.sender, gold);
+            uint256 newgold = snowrules.level2gold(newLevel);
+            snowGold.mintBars(msg.sender, newgold);
 
             userbase.resetHitBy(_userId);
 
