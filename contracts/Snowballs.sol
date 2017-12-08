@@ -299,9 +299,9 @@ contract SnowballUserbase is HasEngine{
         address useraddress;
         uint16 experience;
         uint256 lastHit;
+        uint256 lastHitBy;
         uint256 hitsTaken;
         uint256 hitsGiven;
-        uint256 lastHitBy;
     }
 
     struct hit{
@@ -334,12 +334,16 @@ contract SnowballUserbase is HasEngine{
         return userIds[_user];
     }
 
-    function getUserAdressById(uint256 _id) public constant returns(address){
+    function getAddressById(uint256 _id) public constant returns(address){
         return users[_id].useraddress;
     }
 
     function getAddressByUsername(string _name) public constant returns (address){
-        return getUserAdressById(usernames[_name]);
+        return getAddressById(usernames[_name]);
+    }
+
+    function getUsername(uint _id) public constant returns (string){
+        return users[_id].name;
     }
 
     function getLastHit(uint256 _id) public constant returns (uint256){
@@ -360,6 +364,25 @@ contract SnowballUserbase is HasEngine{
 
     function getHitsGiven(uint256 _id) public constant returns (uint256){
         return users[_id].hitsGiven;
+    }
+
+    function getFullUserInfo(uint256 _id) public constant returns(string name,
+                                                                    address useraddress,
+                                                                    uint16 experience,
+                                                                    uint256 lastHit,
+                                                                    uint256 lastHitBy,
+                                                                    uint256 hitsTaken,
+                                                                    uint256 hitsGiven){
+        return(
+            getUsername(_id),
+            getAddressById(_id),
+            getUserExp(_id),
+            getLastHit(_id),
+            getLastHitBy(_id),
+            getHitsTaken(_id),
+            getHitsGiven(_id)
+        );
+
     }
 
     function getHitLogEntry(uint256 _entry) public constant returns(uint256, uint256){
@@ -407,16 +430,7 @@ contract SnowballUserbase is HasEngine{
 
         // add user to user ids
         userIds[_user] = nUsers;
-        User memory newUser = User({
-            name: '',
-            useraddress: _user,
-            experience: 0,
-            lastHit: 0,
-            hitsTaken: 0,
-            hitsGiven: 0,
-            lastHitBy: 0
-        });
-        users[nUsers] = newUser;
+        users[nUsers].useraddress = _user;
     }
 
     function addHit(uint256 _by, uint256 _to) {
@@ -610,6 +624,7 @@ contract SnowballEngine is TakesDonations{
         // user got some snow via transfer and throws for the first time
         if (userId == 0){
             userbase.addNewUser(msg.sender);
+            userId = userbase.getUserId(msg.sender);
         } else{
             userExp = userbase.getUserExp(userId);
             userLevel = snowrules.getLevel(userExp);
@@ -620,6 +635,7 @@ contract SnowballEngine is TakesDonations{
 
         if (enemyId == 0){
             userbase.addNewUser(_enemy);
+            enemyId = userbase.getUserId(_enemy);
         } else {
             enemyExp = userbase.getUserExp(enemyId);
             enemyLevel = snowrules.getLevel(enemyExp);
