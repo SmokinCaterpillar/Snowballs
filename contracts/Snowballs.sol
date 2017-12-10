@@ -142,11 +142,11 @@ contract MintableToken is ERC20Token {
 }
 
 
-contract TakesDonations{
+contract TakesEther {
 
     address public owner;
 
-    function TakesDonations(){
+    function TakesEther(){
         owner = msg.sender;
     }
 
@@ -168,7 +168,7 @@ contract TakesDonations{
 }
 
 
-contract HasEngine is TakesDonations{
+contract HasEngine is TakesEther {
 
     // address of game enigne, i.e. game rules
     address public engine;
@@ -338,6 +338,11 @@ contract SnowballUserbase is HasEngine{
         return users[_id].useraddress;
     }
 
+    function getIdByUsername(string _name) public constant returns (uint256){
+        address useraddress = getAddressByUsername(_name);
+        return getUserId(useraddress);
+    }
+
     function getAddressByUsername(string _name) public constant returns (address){
         return getAddressById(usernames[_name]);
     }
@@ -398,10 +403,7 @@ contract SnowballUserbase is HasEngine{
         usernamePrice = _amount;
     }
 
-
     function setUsername(string _name) public payable{
-        // username costs some price
-
         require(msg.value >= usernamePrice);
         // username must be unique and should not be taken
         require(getAddressByUsername(_name) == address(0));
@@ -483,7 +485,6 @@ contract SnowballRules is HasEngine{
         setGoldPerLevelUp();
         setWaitingTimePerLevel();
         setLevelNames();
-
     }
 
     function setBallsPerLevel() private{
@@ -580,8 +581,21 @@ contract SnowballRules is HasEngine{
 
 }
 
+contract SnowRelics is HasEngine{
 
-contract SnowballEngine is TakesDonations{
+    string public constant version = '0.0';
+
+    function SnowRelics(address _engine)
+        HasEngine(_engine){}
+
+    function huntRelic(uint256 _userId, uint256 _enemyId){
+        require(msg.sender == engine);
+        // TODO create relic game logic!
+    }
+}
+
+
+contract SnowballEngine is TakesEther {
 
     string public constant version = '0.1';
 
@@ -590,26 +604,38 @@ contract SnowballEngine is TakesDonations{
     address public medals;
     address public base;
     address public rules;
+    address public relics;
+
+    uint256 throwPrice = 0;
 
     function setDependencies(address _balls,
                             address _gold,
                             address _medals,
                             address _base,
-                            address _rules) public{
+                            address _rules,
+                            address _relics) public{
         require(msg.sender == owner);
         balls = _balls;
         gold = _gold;
         medals = _medals;
         base = _base;
         rules = _rules;
+        relics = _relics;
+    }
+
+    function setThrowPrice(uint256 _price){
+        require(msg.sender == owner);
+        throwPrice = _price;
     }
 
     function throwBall(address _enemy) public payable{
         require(_enemy != msg.sender);
+        require(msg.value >= throwPrice);
 
         Snowballs snowballs = Snowballs(balls);
         SnowballUserbase userbase = SnowballUserbase(base);
         SnowballRules snowrules = SnowballRules(rules);
+        SnowRelics snowrelics = SnowRelics(relics);
 
         uint256 enemyId = userbase.getUserId(_enemy);
         uint256 userId = userbase.getUserId(msg.sender);
@@ -647,6 +673,7 @@ contract SnowballEngine is TakesDonations{
             // throw counts
             Hit(msg.sender, _enemy);
             userbase.addHit(userId, enemyId);
+            snowrelics.huntRelic(userId, enemyId);
 
             if (enemyLevel == userLevel && enemyHityById == 0){
                 gatherExperience(userId, userExp, userLevel);
