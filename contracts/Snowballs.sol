@@ -221,35 +221,35 @@ contract SnowGold is MintableToken, HasEngine {
 }
 
 
-contract SnowGodMedals is MintableToken, HasEngine {
-
-    string public constant version = '0.1';
-
-    // Token symbol
-    string public symbol = 'GOD';
-
-    // Name of token
-    string public name = 'Snow God Medals';
-
-    // Gold = BTC
-    uint8 public decimals = 0;
-
-    function SnowGodMedals(address _engine)
-        HasEngine(_engine){
-        // dev supply
-        internalSupply = 42;
-        balances[owner] = internalSupply;
-        Transfer(this, owner, internalSupply);
-    }
-
-    function mintMedal(address _to){
-        // this can only be triggered by the game
-        require(msg.sender == engine);
-
-        mint(_to, 1);
-
-    }
-}
+//contract SnowGodMedals is MintableToken, HasEngine {
+//
+//    string public constant version = '0.1';
+//
+//    // Token symbol
+//    string public symbol = 'GOD';
+//
+//    // Name of token
+//    string public name = 'Snow God Medals';
+//
+//    // Gold = BTC
+//    uint8 public decimals = 0;
+//
+//    function SnowGodMedals(address _engine)
+//        HasEngine(_engine){
+//        // dev supply
+//        internalSupply = 42;
+//        balances[owner] = internalSupply;
+//        Transfer(this, owner, internalSupply);
+//    }
+//
+//    function mintMedal(address _to){
+//        // this can only be triggered by the game
+//        require(msg.sender == engine);
+//
+//        mint(_to, 1);
+//
+//    }
+//}
 
 
 contract Snowballs is MintableToken, HasEngine {
@@ -498,7 +498,6 @@ contract SnowballRules is HasEngine{
         level2balls[6] = 128;
         level2balls[7] = 256;
         level2balls[8] = 512;
-        level2balls[9] = 2048;
     }
 
     function setGoldPerLevelUp() private{
@@ -582,18 +581,6 @@ contract SnowballRules is HasEngine{
 
 }
 
-contract SnowRelics is HasEngine{
-
-    string public constant version = '0.0';
-
-    function SnowRelics(address _engine)
-        HasEngine(_engine){}
-
-    function huntRelic(uint256 _userId, uint256 _enemyId) public{
-        require(msg.sender == engine);
-        // TODO create relic game logic!
-    }
-}
 
 contract SnowballEngine is TakesEther {
 
@@ -601,31 +588,31 @@ contract SnowballEngine is TakesEther {
 
     address public balls;
     address public gold;
-    address public medals;
     address public base;
     address public rules;
-    address public relics;
 
-    uint256 throwPrice = 0;
+    uint256 public throwPrice = 0;
+    uint256 public minBalance = 1 finney;
 
     function setDependencies(address _balls,
                             address _gold,
-                            address _medals,
                             address _base,
-                            address _rules,
-                            address _relics) public{
+                            address _rules) public{
         require(msg.sender == owner);
         balls = _balls;
         gold = _gold;
-        medals = _medals;
         base = _base;
         rules = _rules;
-        relics = _relics;
     }
 
     function setThrowPrice(uint256 _price) public {
         require(msg.sender == owner);
         throwPrice = _price;
+    }
+
+    function setMinBalance(uint256 _balance){
+        require(msg.sender == owner);
+        minBalance = _balance;
     }
 
     function throwBall(address _enemy) public payable{
@@ -635,7 +622,6 @@ contract SnowballEngine is TakesEther {
         Snowballs snowballs = Snowballs(balls);
         SnowballUserbase userbase = SnowballUserbase(base);
         SnowballRules snowrules = SnowballRules(rules);
-        SnowRelics snowrelics = SnowRelics(relics);
 
         uint256 enemyId = userbase.getUserId(_enemy);
         uint256 userId = userbase.getUserId(msg.sender);
@@ -673,10 +659,11 @@ contract SnowballEngine is TakesEther {
             // throw counts
             Hit(msg.sender, _enemy);
             userbase.addHit(userId, enemyId);
-            snowrelics.huntRelic(userId, enemyId);
 
             if (enemyLevel == userLevel && enemyHityById == 0){
-                gatherExperience(userId, userExp, userLevel);
+                if (enemyExp > 0 || _enemy.balance >= minBalance){
+                    gatherExperience(userId, userExp, userLevel);
+                }
             }
         }
     }
@@ -709,12 +696,6 @@ contract SnowballEngine is TakesEther {
             LevelUp(msg.sender);
 
             if (newLevel == snowrules.maxLevel()){
-                SnowGodMedals snowMedals = SnowGodMedals(medals);
-                snowMedals.mintMedal(msg.sender);
-
-                newBalls = snowrules.level2balls(newLevel);
-                snowballs.rollBalls(msg.sender, newBalls);
-
                 BecameGod(msg.sender);
             }
         }

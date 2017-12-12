@@ -5,10 +5,9 @@ from prompt_toolkit.renderer import _TokenToAttrsCache
 dev_supply = 99999
 gold_unit = 100000000
 dev_gold = 33333*gold_unit
-dev_medals = 42
 
 ether = int(1e18)
-finney = int(ether/100)
+finney = int(ether/1000)
 
 
 def deploy_all_the_stuff(chain):
@@ -29,11 +28,6 @@ def deploy_all_the_stuff(chain):
        deploy_args=[engine_address]
     )
 
-    medals, deploy_txn_hash2 = provider.get_or_deploy_contract(
-       'SnowGodMedals',
-       deploy_args=[engine_address]
-    )
-
     base, deploy_txn_hash2 = provider.get_or_deploy_contract(
        'SnowballUserbase',
        deploy_args=[engine_address]
@@ -44,19 +38,12 @@ def deploy_all_the_stuff(chain):
        deploy_args=[engine_address]
     )
 
-    relics, deploy_txn_hash2 = provider.get_or_deploy_contract(
-       'SnowRelics',
-       deploy_args=[engine_address]
-    )
-
     chain.wait.for_receipt(engine.transact().setDependencies(balls.address,
                                                              gold.address,
-                                                             medals.address,
                                                              base.address,
-                                                             rules.address,
-                                                             relics.address))
+                                                             rules.address))
 
-    return engine, balls, gold, medals, base, rules, relics
+    return engine, balls, gold, base, rules
 
 
 def set_debug_settings(chain, rules):
@@ -174,64 +161,13 @@ def test_gold_transfer(chain, accounts):
     assert soul_token.call().allowance(accounts[0], accounts[2]) == 0
 
 
-def test_medal_transfer(chain, accounts):
-    provider = chain.provider
-
-    soul_token, deploy_txn_hash2 = provider.get_or_deploy_contract(
-       'SnowGodMedals',
-       deploy_args=[accounts[0]]
-    )
-
-    assert soul_token.call().balanceOf(accounts[0]) == dev_medals
-
-    # does nothing because of insufficient funds
-    chain.wait.for_receipt(soul_token.transact().transfer(accounts[1], int(199925)))
-    assert soul_token.call().balanceOf(accounts[0]) == dev_medals
-
-    # transfer the tokens
-    chain.wait.for_receipt(soul_token.transact().transfer(accounts[1], int(25)))
-
-    # check that transfer worled
-    assert soul_token.call().balanceOf(accounts[0]) == dev_medals - int(25)
-    assert soul_token.call().balanceOf(accounts[1]) == int(25)
-
-    # approve some future transfers
-    chain.wait.for_receipt(soul_token.transact().approve(accounts[2], int(50)))
-
-    # check for to large sending
-    chain.wait.for_receipt(soul_token.transact({'from': accounts[2]}).transferFrom(accounts[0],
-                                                                                 accounts[1],
-                                                                                 int(51)))
-
-    # there should be no transfer because the amount was too large
-    assert soul_token.call().balanceOf(accounts[0]) == dev_medals - int(25)
-    assert soul_token.call().balanceOf(accounts[1]) == int(25)
-
-    # this should be allowed
-    chain.wait.for_receipt(soul_token.transact({'from': accounts[2]}).transferFrom(accounts[0],
-                                                                                 accounts[1],
-                                                                                 int(17)))
-
-    assert soul_token.call().balanceOf(accounts[0]) == 0
-    assert soul_token.call().balanceOf(accounts[1]) == 42
-    assert soul_token.call().allowance(accounts[0], accounts[2]) == 33
-
-    # this cannot work in this case
-    chain.wait.for_receipt(soul_token.transact({'from': accounts[2]}).transferFrom(accounts[0],
-                                                                                 accounts[1],
-                                                                                 int(25)))
-
-    assert soul_token.call().balanceOf(accounts[0]) == 0
-    assert soul_token.call().balanceOf(accounts[1]) == 42
-    assert soul_token.call().allowance(accounts[0], accounts[2]) == 33
-
-
 def test_deploy(chain, accounts):
     provider = chain.provider
     engine, deploy_txn_hash2 = provider.get_or_deploy_contract(
        'SnowballEngine'
     )
     assert engine.call().owner() == accounts[0]
+
 
 def test_deploy_rules(chain, accounts):
     provider = chain.provider
@@ -243,7 +179,7 @@ def test_deploy_rules(chain, accounts):
 
 
 def test_first_throw(chain, accounts):
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     set_debug_settings(chain, rules)
 
@@ -282,8 +218,30 @@ def test_first_throw(chain, accounts):
         stuff = chain.wait.for_receipt(engine.transact({'from': accounts[1]}).throwBall(accounts[2]))
 
 
+def test_min_balance(chain, accounts):
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
+
+    set_debug_settings(chain, rules)
+
+    web3 = chain.web3
+    balance = web3.eth.getBalance(accounts[1])
+    balance = balance - finney + 10
+    chain.wait.for_receipt(web3.eth.sendTransaction({'value':balance,
+                                                     'from':accounts[1],
+                                                     'to': engine.address,
+                                                     'gas':200000}))
+
+    stuff = chain.wait.for_receipt(engine.transact().throwBall(accounts[1]))
+
+    assert base.call().totalHits() == 1
+    assert base.call().getExperiencLogEntry(0) == 2
+    assert base.call().getExperiencLogEntry(1) == 0
+    assert balls.call().balanceOf(accounts[0]) == dev_supply - 1
+    assert balls.call().balanceOf(accounts[1]) == 1
+
+
 def testLevelUp(chain, accounts):
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     set_debug_settings(chain, rules)
 
@@ -331,11 +289,15 @@ def testLevelUp(chain, accounts):
     stuff = chain.wait.for_receipt(engine.transact().throwBall(accounts[2]))
     stuff = chain.wait.for_receipt(engine.transact().throwBall(accounts[3]))
 
+    # blow some time
+    for irun in range(5):
+        chain.wait.for_receipt(base.transact().getFullUserInfo(1))
+
     stuff = chain.wait.for_receipt(engine.transact({'from': accounts[1]}).throwBall(accounts[3]))
 
     # should fail because paralyzed
     with pytest.raises((TransactionFailed)):
-        stuff = chain.wait.for_receipt(engine.transact({'from': accounts[2]}).throwBall(accounts[3]))
+        stuff = chain.wait.for_receipt(engine.transact({'from': accounts[3]}).throwBall(accounts[2]))
 
     # should fail because no self hit
     with pytest.raises((TransactionFailed)):
@@ -418,7 +380,7 @@ def testLevelUp(chain, accounts):
 
 def test_become_god(chain, accounts):
 
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     set_debug_settings(chain, rules)
 
@@ -451,7 +413,7 @@ def test_become_god(chain, accounts):
     stuff = chain.wait.for_receipt(engine.transact().throwBall(accounts[6]))
 
     assert base.call().getUserExp(1) == 4
-    assert balls.call().balanceOf(accounts[0]) == dev_supply - 4 + 4 - 30 + 8 + 8 ## including god stuff
+    assert balls.call().balanceOf(accounts[0]) == dev_supply - 4 + 4 - 30 + 8 ## including god stuff
 
     assert balls.call().balanceOf(accounts[1]) == 1
     assert balls.call().balanceOf(accounts[2]) == 1
@@ -462,13 +424,11 @@ def test_become_god(chain, accounts):
     assert gold.call().balanceOf(accounts[6]) == 1 * gold_unit
     assert gold.call().totalSupply() == dev_gold + 5 * gold_unit
 
-    assert medals.call().balanceOf(accounts[0]) == dev_medals + 1
-    assert medals.call().balanceOf(accounts[6]) == 0
 
 
 def test_god_invincible(chain, accounts):
 
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     set_debug_settings(chain, rules)
 
@@ -521,8 +481,6 @@ def test_god_invincible(chain, accounts):
 
     stuff = chain.wait.for_receipt(engine.transact({'from': accounts[6]}).throwBall(accounts[1]))
 
-    assert medals.call().totalSupply() == dev_medals + 2
-
     totalHits = base.call().totalHits()
 
     balls6 = balls.call().balanceOf(accounts[6])
@@ -535,7 +493,7 @@ def test_god_invincible(chain, accounts):
 
 def test_ownership_transfer(chain, accounts):
 
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(engine.transact({'from': accounts[6]}).changeOwnership(accounts[1]))
@@ -553,7 +511,7 @@ def test_ownership_transfer(chain, accounts):
 
 def test_engine_change(chain, accounts):
 
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(balls.transact({'from': accounts[1]}).changeEngine(accounts[1]))
@@ -571,7 +529,7 @@ def test_engine_change(chain, accounts):
 
 
 def test_payable_throw(chain, accounts):
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     chain.wait.for_receipt(balls.transact({'from': accounts[0]}).transfer(accounts[2], 100))
     chain.wait.for_receipt(engine.transact({'from': accounts[0]}).changeOwnership(accounts[1]))
@@ -606,7 +564,7 @@ def test_payable_throw(chain, accounts):
 
 
 def test_register_username(chain, accounts):
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     chain.wait.for_receipt(base.transact({'from': accounts[0]}).setUsernamePrice(100))
 
@@ -668,7 +626,7 @@ def test_register_username(chain, accounts):
 
 
 def test_game_pause(chain, accounts):
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     stuff = chain.wait.for_receipt(engine.transact().throwBall(accounts[1]))
 
@@ -683,13 +641,10 @@ def test_game_pause(chain, accounts):
 
 
 def test_security(chain, accounts):
-    engine, balls, gold, medals, base, rules, relics = deploy_all_the_stuff(chain)
+    engine, balls, gold, base, rules = deploy_all_the_stuff(chain)
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(balls.transact({'from': accounts[1]}).changeEngine(accounts[1]))
-
-    with pytest.raises(TransactionFailed):
-        chain.wait.for_receipt(relics.transact({'from': accounts[1]}).huntRelic(12,3))
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(balls.transact({'from': accounts[1]}).withdraw())
@@ -705,9 +660,6 @@ def test_security(chain, accounts):
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(gold.transact({'from': accounts[1]}).mintBars(accounts[1], 10))
-
-    with pytest.raises(TransactionFailed):
-        chain.wait.for_receipt(medals.transact({'from': accounts[1]}).mintMedal(accounts[1]))
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(base.transact({'from': accounts[1]}).setUsernamePrice(10))
@@ -745,10 +697,8 @@ def test_security(chain, accounts):
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(engine.transact({'from': accounts[1]}).setDependencies(balls.address,
                                                              gold.address,
-                                                             medals.address,
                                                              base.address,
-                                                             rules.address,
-                                                             relics.address))
+                                                             rules.address))
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(engine.transact({'from': accounts[1]}).setThrowPrice(11))
