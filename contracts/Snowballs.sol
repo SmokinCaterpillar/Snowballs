@@ -137,6 +137,7 @@ contract MintableToken is ERC20Token {
         // roll the new balls
         internalSupply += _amount;
         balances[_beneficiary] += _amount;
+        Transfer(this, _beneficiary, _amount);
     }
 
 }
@@ -189,7 +190,7 @@ contract HasEngine is TakesEther {
 
 
 contract SnowGold is MintableToken, HasEngine {
-    string public constant version = '0.1.0';
+    string public constant version = '0.1';
 
     // Token symbol
     string public symbol = 'SGC';
@@ -540,7 +541,7 @@ contract SnowballRules is HasEngine{
         return _experience / expPerLevel;
     }
 
-    function allowedToThrow(uint16 _level, uint256 _lastHit) public returns(bool){
+    function allowedToThrow(uint16 _level, uint256 _lastHit) constant public returns(bool){
         return gameActive && (now > _lastHit + level2time[_level]);
     }
 
@@ -588,12 +589,11 @@ contract SnowRelics is HasEngine{
     function SnowRelics(address _engine)
         HasEngine(_engine){}
 
-    function huntRelic(uint256 _userId, uint256 _enemyId){
+    function huntRelic(uint256 _userId, uint256 _enemyId) public{
         require(msg.sender == engine);
         // TODO create relic game logic!
     }
 }
-
 
 contract SnowballEngine is TakesEther {
 
@@ -623,7 +623,7 @@ contract SnowballEngine is TakesEther {
         relics = _relics;
     }
 
-    function setThrowPrice(uint256 _price){
+    function setThrowPrice(uint256 _price) public {
         require(msg.sender == owner);
         throwPrice = _price;
     }
