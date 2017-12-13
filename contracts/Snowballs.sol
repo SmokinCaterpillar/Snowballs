@@ -147,21 +147,24 @@ contract TakesEther {
 
     address public owner;
 
-    function TakesEther(){
+    function TakesEther() public{
         owner = msg.sender;
     }
 
+    // send donations to owner
     function withdraw() public{
         // send donations to owner
         require(msg.sender == owner);
         owner.transfer(this.balance);
     }
 
+    // one can change the owner
     function changeOwnership(address _owner) public{
         require(msg.sender == owner);
         owner = _owner;
     }
 
+    // accepts donations
     function () public payable{
         // just take donations
     }
@@ -174,7 +177,7 @@ contract HasEngine is TakesEther {
     // address of game enigne, i.e. game rules
     address public engine;
 
-    function HasEngine(address _engine){
+    function HasEngine(address _engine) public{
         engine = _engine;
     }
 
@@ -184,9 +187,6 @@ contract HasEngine is TakesEther {
         engine = _engine;
     }
 }
-
-
-
 
 
 contract SnowGold is MintableToken, HasEngine {
@@ -201,55 +201,25 @@ contract SnowGold is MintableToken, HasEngine {
     // Gold = BTC
     uint8 public decimals = 8;
 
+    // unit = 10**decimals
     uint256 public unit = 100000000;
 
     function SnowGold(address _engine)
-        HasEngine(_engine){
+        HasEngine(_engine) public{
         // dev supply
         internalSupply = 33333 * unit;
         balances[owner] = internalSupply;
         Transfer(this, owner, internalSupply);
     }
 
-    function mintBars(address _to, uint256 _amount){
+    // creates new gold
+    function mintBars(address _to, uint256 _amount) public{
         // this can only be triggered by the game
         require(msg.sender == engine);
-
         mint(_to, _amount * unit);
 
     }
 }
-
-
-//contract SnowGodMedals is MintableToken, HasEngine {
-//
-//    string public constant version = '0.1';
-//
-//    // Token symbol
-//    string public symbol = 'GOD';
-//
-//    // Name of token
-//    string public name = 'Snow God Medals';
-//
-//    // Gold = BTC
-//    uint8 public decimals = 0;
-//
-//    function SnowGodMedals(address _engine)
-//        HasEngine(_engine){
-//        // dev supply
-//        internalSupply = 42;
-//        balances[owner] = internalSupply;
-//        Transfer(this, owner, internalSupply);
-//    }
-//
-//    function mintMedal(address _to){
-//        // this can only be triggered by the game
-//        require(msg.sender == engine);
-//
-//        mint(_to, 1);
-//
-//    }
-//}
 
 
 contract Snowballs is MintableToken, HasEngine {
@@ -267,20 +237,23 @@ contract Snowballs is MintableToken, HasEngine {
 
 
     function Snowballs(address _engine)
-        HasEngine( _engine){
+        HasEngine( _engine) public{
         // dev supply
         internalSupply = 99999;
         balances[owner] = internalSupply;
         Transfer(this, owner, internalSupply);
     }
 
+    // throws a snow ball at an enemy
+    // not triggered by user but by engine
     function throwBall(address _from, address _to) public returns(bool){
         // this can only be triggered by the game
         require(msg.sender == engine);
         return executeTransfer(_from, _to, 1);
     }
 
-    function rollBalls(address _to, uint256 _amount){
+    // mints new Snowballs
+    function rollBalls(address _to, uint256 _amount)public{
         // this can only be triggered by the game
         require(msg.sender == engine);
 
@@ -296,13 +269,14 @@ contract SnowballUserbase is HasEngine{
     string public constant version = '0.1';
 
     struct User{
-        string name;
-        address useraddress;
-        uint16 experience;
-        uint256 lastHit;
-        uint256 lastHitBy;
-        uint256 hitsTaken;
-        uint256 hitsGiven;
+        string name;  // optional username
+        address useraddress;  // eth address
+        uint16 level;  // level of user
+        uint16 maxLevel;  // maximum level she or he ever achieved
+        uint256 lastHit;  // time of last hit
+        uint256 lastHitBy;  // user id of last hitter
+        uint256 hitsTaken;  // number of times hit by others
+        uint256 hitsGiven;  // number of times thrown at others
     }
 
     struct hit{
@@ -311,8 +285,7 @@ contract SnowballUserbase is HasEngine{
     }
 
     function SnowballUserbase(address _engine)
-        HasEngine(_engine){
-
+        HasEngine(_engine) public{
     }
 
     uint256 public totalHits;
@@ -329,7 +302,7 @@ contract SnowballUserbase is HasEngine{
 
     mapping(uint256 => hit) private hitLog;
 
-    mapping(uint16 => uint256) private experienceLog;
+    mapping(uint16 => uint256) private levelLog;
 
     function getUserId(address _user) public constant returns (uint256){
         return userIds[_user];
@@ -360,8 +333,12 @@ contract SnowballUserbase is HasEngine{
         return users[_id].lastHitBy;
     }
 
-    function getUserExp(uint256 _id) public constant returns (uint16){
-        return users[_id].experience;
+    function getUserLevel(uint256 _id) public constant returns (uint16){
+        return users[_id].level;
+    }
+
+    function getMaxLevel(uint256 _id) public constant returns (uint16){
+        return users[_id].maxLevel;
     }
 
     function getHitsTaken(uint256 _id) public constant returns (uint256){
@@ -372,17 +349,18 @@ contract SnowballUserbase is HasEngine{
         return users[_id].hitsGiven;
     }
 
-    function getFullUserInfo(uint256 _id) public constant returns(string name,
-                                                                    address useraddress,
-                                                                    uint16 experience,
-                                                                    uint256 lastHit,
-                                                                    uint256 lastHitBy,
-                                                                    uint256 hitsTaken,
-                                                                    uint256 hitsGiven){
+    function getFullUserInfo(uint256 _id) public
+        constant returns(address useraddress,
+                         uint16 level,
+                         uint16 maxLevel,
+                         uint256 lastHit,
+                         uint256 lastHitBy,
+                         uint256 hitsTaken,
+                         uint256 hitsGiven){
         return(
-            getUsername(_id),
             getAddressById(_id),
-            getUserExp(_id),
+            getUserLevel(_id),
+            getMaxLevel(_id),
             getLastHit(_id),
             getLastHitBy(_id),
             getHitsTaken(_id),
@@ -395,8 +373,8 @@ contract SnowballUserbase is HasEngine{
         return (hitLog[_entry].userId, hitLog[_entry].enemyId);
     }
 
-    function getExperiencLogEntry(uint16 _entry) public constant returns(uint256){
-        return experienceLog[_entry];
+    function getLevelLogEntry(uint16 _entry) public constant returns(uint256){
+        return levelLog[_entry];
     }
 
     function setUsernamePrice(uint256 _amount) public{
@@ -428,157 +406,48 @@ contract SnowballUserbase is HasEngine{
         // ad new user
         nUsers += 1;
 
-        // count experiences
-        experienceLog[0] += 1;
+        // count levels
+        levelLog[0] += 1;
 
         // add user to user ids
         userIds[_user] = nUsers;
         users[nUsers].useraddress = _user;
     }
 
-    function addHit(uint256 _by, uint256 _to) {
+    // Adds a hit, i.e. a throw `_by` hitting `_to`
+    function addHit(uint256 _by, uint256 _to) public{
         require(msg.sender == engine);
+        uint16 oldLevel;
+        uint16 newLevel;
+
         users[_to].lastHitBy = _by;
         users[_to].lastHit = now;
         users[_to].hitsTaken += 1;
         users[_by].hitsGiven += 1;
-
         totalHits += 1;
+
+        oldLevel = users[_to].level;
+        changeLevelLog(_to, oldLevel, 0);
+
+        oldLevel = users[_by].level;
+        newLevel = oldLevel + 1;
+        changeLevelLog(_by, oldLevel, newLevel);
+
+        if (newLevel > users[_by].maxLevel){
+            users[_by].maxLevel = newLevel;
+        }
 
         hitLog[totalHits].userId = _by;
         hitLog[totalHits].enemyId = _to;
     }
 
-    function setExp(uint256 _id, uint16 _exp) public{
-        require(msg.sender == engine);
-        uint16 oldExp = users[_id].experience;
-        experienceLog[oldExp] -= 1;
-        users[_id].experience = _exp;
-        experienceLog[_exp] += 1;
+    // internal function to update the log
+    // i.e. move one entry higher or lower
+    function changeLevelLog(uint256 _id, uint16 _old, uint16 _new) internal{
+        users[_id].level = _new;
+        levelLog[_old] -= 1;
+        levelLog[_new] += 1;
     }
-
-    function resetHitBy(uint256 _id) public{
-        require(msg.sender == engine);
-        users[_id].lastHitBy = 0;
-        users[_id].lastHit = 0;
-    }
-
-}
-
-
-contract SnowballRules is HasEngine{
-
-    string public constant version = '0.1';
-
-    uint16 public maxLevel = 9;
-    uint16 public expPerLevel = 3;
-
-    bool public gameActive = true;
-
-    mapping (uint16 => uint256) public level2balls;
-    mapping (uint16 => uint256) public level2gold;
-    mapping (uint16 => uint256) public level2time;
-    mapping (uint16 => string) public level2rank;
-
-    function SnowballRules(address _engine)
-        HasEngine(_engine){
-        setBallsPerLevel();
-        setGoldPerLevelUp();
-        setWaitingTimePerLevel();
-        setLevelNames();
-    }
-
-    function setBallsPerLevel() private{
-        level2balls[0] = 2;
-        level2balls[1] = 4;
-        level2balls[2] = 8;
-        level2balls[3] = 16;
-        level2balls[4] = 32;
-        level2balls[5] = 64;
-        level2balls[6] = 128;
-        level2balls[7] = 256;
-        level2balls[8] = 512;
-    }
-
-    function setGoldPerLevelUp() private{
-        level2gold[2] = 1;
-        level2gold[3] = 2;
-        level2gold[4] = 4;
-        level2gold[5] = 8;
-        level2gold[6] = 16;
-        level2gold[7] = 32;
-        level2gold[8] = 64;
-        level2gold[9] = 293;
-    }
-
-    function setWaitingTimePerLevel() private{
-        level2time[0] = 48 hours;
-        level2time[1] = 40 hours;
-        level2time[2] = 36 hours;
-        level2time[3] = 32 hours;
-        level2time[4] = 28 hours;
-        level2time[5] = 24 hours;
-        level2time[6] = 20 hours;
-        level2time[7] = 16 hours;
-        level2time[8] = 12 hours;
-    }
-
-    function setLevelNames() private{
-        level2rank[0] = 'Snow White';
-        level2rank[1] = 'Snow Cadet';
-        level2rank[2] = 'Snow Officer';
-        level2rank[3] = 'Snow Lieutenant';
-        level2rank[4] = 'Snow Commander';
-        level2rank[5] = 'Snow Captain';
-        level2rank[6] = 'Snow General';
-        level2rank[7] = 'Snow High Priest';
-        level2rank[8] = 'Snow Demigod';
-        level2rank[9] = 'Snow God';
-    }
-
-    function getLevel(uint16 _experience) public constant returns(uint16){
-        return _experience / expPerLevel;
-    }
-
-    function allowedToThrow(uint16 _level, uint256 _lastHit) constant public returns(bool){
-        return gameActive && (now > _lastHit + level2time[_level]);
-    }
-
-    function setGameState(bool _state) public{
-        require(msg.sender == owner);
-        gameActive = _state;
-    }
-
-    function setMaxLevel(uint16 _level) public {
-        require(msg.sender == owner);
-        maxLevel = _level;
-    }
-
-    function setExpPerLevel(uint16 _exp) public {
-        require(msg.sender == owner);
-        expPerLevel = _exp;
-    }
-
-    function setLevelName(uint16 _level, string _name) public {
-        require(msg.sender == owner);
-        level2rank[_level] = _name;
-    }
-
-    function setLevelWaitingTime(uint16 _level, uint256 _time) public {
-        require(msg.sender == owner);
-        level2time[_level] = _time;
-    }
-
-    function setLevelUpGold(uint16 _level, uint256 _gold) public {
-        require(msg.sender == owner);
-        level2gold[_level] = _gold;
-    }
-
-    function setLevelBalls(uint16 _level, uint256 _balls) public {
-        require(msg.sender == owner);
-        level2balls[_level] = _balls;
-    }
-
 }
 
 
@@ -589,20 +458,33 @@ contract SnowballEngine is TakesEther {
     address public balls;
     address public gold;
     address public base;
-    address public rules;
 
     uint256 public throwPrice = 0;
     uint256 public minBalance = 1 finney;
+    uint256 public maxBalls = 1024;
+    uint256 public maxGold = 512;
+    uint256 public newPlayerBonus = 3;
+    uint16 public minGoldLevel = 2;
+    uint256 public freezeTime = 30 minutes;
+    bool public active = true;
 
     function setDependencies(address _balls,
                             address _gold,
-                            address _base,
-                            address _rules) public{
+                            address _base) public{
         require(msg.sender == owner);
         balls = _balls;
         gold = _gold;
         base = _base;
-        rules = _rules;
+    }
+
+    function setRules(uint256 _time, uint256 _balls,
+                      uint256 _gold, uint16 _exp, uint256 _bonus) public {
+        require(msg.sender == owner);
+        maxGold = _gold;
+        maxBalls = _balls;
+        freezeTime = _time;
+        minGoldLevel = _exp;
+        newPlayerBonus = _bonus;
     }
 
     function setThrowPrice(uint256 _price) public {
@@ -610,105 +492,94 @@ contract SnowballEngine is TakesEther {
         throwPrice = _price;
     }
 
-    function setMinBalance(uint256 _balance){
+    function setMinBalance(uint256 _balance) public{
         require(msg.sender == owner);
         minBalance = _balance;
     }
 
+    function setGameState(bool _state) public{
+        require(msg.sender == owner);
+        active = _state;
+    }
+
+    function noFreeze(uint256 _time) public constant returns(bool){
+        return now - freezeTime > _time;
+    }
+
     function throwBall(address _enemy) public payable{
+        require(active);
         require(_enemy != msg.sender);
         require(msg.value >= throwPrice);
 
-        Snowballs snowballs = Snowballs(balls);
         SnowballUserbase userbase = SnowballUserbase(base);
-        SnowballRules snowrules = SnowballRules(rules);
+        Snowballs snowballs = Snowballs(balls);
 
         uint256 enemyId = userbase.getUserId(_enemy);
         uint256 userId = userbase.getUserId(msg.sender);
-        uint256 enemyHityById = 0;
         uint256 userLastHit = userbase.getLastHit(userId);
 
         uint16 enemyLevel = 0;
-        uint16 enemyExp = 0;
         uint16 userLevel = 0;
-        uint16 userExp = 0;
+        uint256 enemyLastHit = 0;
 
-        // user got some snow via transfer and throws for the first time
+        require(noFreeze(userLastHit));
+        require(msg.sender.balance >= minBalance);
+        require(snowballs.throwBall(msg.sender, _enemy));
+
         if (userId == 0){
+            // user got some snow via transfer and throws for the first time
             userbase.addNewUser(msg.sender);
             userId = userbase.getUserId(msg.sender);
         } else{
-            userExp = userbase.getUserExp(userId);
-            userLevel = snowrules.getLevel(userExp);
+            userLevel = userbase.getUserLevel(userId);
         }
-
-        require(snowrules.allowedToThrow(userLevel, userLastHit));
-        require(snowballs.throwBall(msg.sender, _enemy));
-
         if (enemyId == 0){
             userbase.addNewUser(_enemy);
             enemyId = userbase.getUserId(_enemy);
         } else {
-            enemyExp = userbase.getUserExp(enemyId);
-            enemyLevel = snowrules.getLevel(enemyExp);
-            enemyHityById = userbase.getLastHitBy(enemyId);
+            enemyLevel = userbase.getUserLevel(enemyId);
+            enemyLastHit = userbase.getLastHit(enemyId);
         }
 
         // check if ball throwing actually has an effect
-        if (enemyLevel < snowrules.maxLevel() && enemyLevel <= userLevel){
+        if ((enemyLevel >= userLevel) &&
+                noFreeze(enemyLastHit) &&
+                (_enemy.balance >= minBalance)){
             // throw counts
             Hit(msg.sender, _enemy);
             userbase.addHit(userId, enemyId);
 
-            if (enemyLevel == userLevel && enemyHityById == 0){
-                if (enemyExp > 0 || _enemy.balance >= minBalance){
-                    gatherExperience(userId, userExp, userLevel);
-                }
-            }
+            newGoldAndBalls(userLevel, enemyLastHit);
         }
     }
 
-    function gatherExperience(uint256 _userId,
-                              uint16 _userExp,
-                              uint16 _userLevel) internal {
-        SnowballUserbase userbase = SnowballUserbase(base);
-        SnowballRules snowrules = SnowballRules(rules);
+    function newGoldAndBalls(uint16 _userLevel, uint256 _enemyLastHit) internal {
         Snowballs snowballs = Snowballs(balls);
 
-        assert(_userLevel < snowrules.maxLevel());
-
-        uint16 newExp = _userExp += 1;
-        uint16 newLevel = snowrules.getLevel(newExp);
-        uint256 newBalls = snowrules.level2balls(_userLevel);
+        uint256 newBalls = 2**uint256(_userLevel);
+        if (_enemyLastHit == 0){
+            // get an extra balls for new players
+            newBalls += newPlayerBonus;
+        }
+        if (newBalls > maxBalls){
+            newBalls = maxBalls;
+        }
 
         snowballs.rollBalls(msg.sender, newBalls);
-        userbase.setExp(_userId, newExp);
 
-        Experience(msg.sender);
-
-        if (newLevel > _userLevel){
+        if (_userLevel >= minGoldLevel){
             SnowGold snowGold = SnowGold(gold);
-            uint256 newgold = snowrules.level2gold(newLevel);
-            snowGold.mintBars(msg.sender, newgold);
 
-            userbase.resetHitBy(_userId);
-
-            LevelUp(msg.sender);
-
-            if (newLevel == snowrules.maxLevel()){
-                BecameGod(msg.sender);
+            uint256 newGold = 2**uint256(_userLevel - minGoldLevel);
+            if (newGold > maxGold){
+                newGold = maxGold;
             }
+
+            snowGold.mintBars(msg.sender, newGold);
         }
     }
 
-     // Triggered when tokens are transferred.
+     // Triggered legit hit are transferred.
     event Hit(address indexed _from, address indexed _to);
-
-    // Triggered whenever approve(address _spender, uint256 _value) is called.
-    event Experience(address indexed _user);
-
-    event LevelUp(address indexed _user);
-
-    event BecameGod(address indexed _user);
 
 }
