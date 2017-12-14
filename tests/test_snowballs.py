@@ -417,35 +417,31 @@ def test_payable_throw(chain, accounts):
 def test_register_username(chain, accounts):
     engine, balls, gold, base = deploy_all_the_stuff(chain)
 
-    chain.wait.for_receipt(base.transact({'from': accounts[0]}).setUsernamePrice(100))
+    chain.wait.for_receipt(engine.transact({'from': accounts[0]}).setUsernamePrice(100))
 
     chain.wait.for_receipt(balls.transact({'from': accounts[0]}).transfer(accounts[1], 10))
 
     chain.wait.for_receipt(engine.transact({'from': accounts[1]}).throwBall(accounts[2]))
 
     with pytest.raises(TransactionFailed):
-        chain.wait.for_receipt(base.transact({'from': accounts[2]}).setUsername('Brian'))
-
-    with pytest.raises(TransactionFailed):
-        chain.wait.for_receipt(base.transact({'from': accounts[5], 'value':100}).setUsername('Brian'))
+        chain.wait.for_receipt(engine.transact({'from': accounts[2]}).setUsername('Brian'))
 
     chain.wait.for_receipt(engine.transact({'from': accounts[0]}).throwBall(accounts[5]))
 
-
-    chain.wait.for_receipt(base.transact({'from': accounts[2], 'value':100}).setUsername('Brian'))
+    chain.wait.for_receipt(engine.transact({'from': accounts[2], 'value':100}).setUsername('Brian'))
 
     with pytest.raises(TransactionFailed):
-        chain.wait.for_receipt(base.transact({'from': accounts[5], 'value':100}).setUsername('Brian'))
+        chain.wait.for_receipt(engine.transact({'from': accounts[5], 'value':100}).setUsername('Brian'))
 
-    chain.wait.for_receipt(base.transact({'from': accounts[5], 'value':100}).setUsername('Mary'))
+    chain.wait.for_receipt(engine.transact({'from': accounts[5], 'value':100}).setUsername('Mary'))
 
     web3 = chain.web3
 
-    assert web3.eth.getBalance(base.address) == 200
+    assert web3.eth.getBalance(engine.address) == 200
 
-    chain.wait.for_receipt(base.transact().withdraw())
+    chain.wait.for_receipt(engine.transact().withdraw())
 
-    assert web3.eth.getBalance(base.address) == 0
+    assert web3.eth.getBalance(engine.address) == 0
 
     idbrian = base.call().getIdByUsername('Brian')
     idmary = base.call().getIdByUsername('Mary')
@@ -478,6 +474,30 @@ def test_register_username(chain, accounts):
     assert hitby == 0
     assert taken == 0
     assert given == 1
+
+    chain.wait.for_receipt(engine.transact({'from': accounts[0]}).setUsernameBonus(5))
+
+    with pytest.raises(TransactionFailed):
+        chain.wait.for_receipt(engine.transact({'from': accounts[9], 'value':100}).setUsername(''))
+
+    chain.wait.for_receipt(engine.transact({'from': accounts[9], 'value':100}).setUsername('Ladida'))
+
+    address, exp, max_exp, hit, hitby, taken, given = base.call().getFullUserInfo(5)
+    name = base.call().getUsername(5)
+
+    assert base.call().nUsers() == 5
+    assert base.call().getUserId(accounts[9]) == 5
+
+    assert address == accounts[9]
+    assert name == 'Ladida'
+    assert exp == 0
+    assert max_exp == 0
+    assert hit == 0
+    assert hitby == 0
+    assert taken == 0
+    assert given == 0
+
+    assert balls.call().balanceOf(accounts[9]) == 5
 
 
 def test_game_pause(chain, accounts):
@@ -517,7 +537,13 @@ def test_security(chain, accounts):
         chain.wait.for_receipt(gold.transact({'from': accounts[1]}).mintBars(accounts[1], 10))
 
     with pytest.raises(TransactionFailed):
-        chain.wait.for_receipt(base.transact({'from': accounts[1]}).setUsernamePrice(10))
+        chain.wait.for_receipt(engine.transact({'from': accounts[1]}).setUsernamePrice(10))
+
+    with pytest.raises(TransactionFailed):
+        chain.wait.for_receipt(engine.transact({'from': accounts[1]}).setUsernameBonus(10))
+
+    with pytest.raises(TransactionFailed):
+        chain.wait.for_receipt(base.transact({'from': accounts[1]}).setUsername(accounts[1], 'hi'))
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(base.transact({'from': accounts[1]}).addNewUser(accounts[1]))

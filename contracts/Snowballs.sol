@@ -292,8 +292,6 @@ contract SnowballUserbase is HasEngine{
 
     uint256 public nUsers;
 
-    uint256 public usernamePrice = 0;
-
     mapping(uint256 => User) private users;
 
     mapping(address => uint256) private userIds;
@@ -377,19 +375,17 @@ contract SnowballUserbase is HasEngine{
         return levelLog[_entry];
     }
 
-    function setUsernamePrice(uint256 _amount) public{
-        require(msg.sender == owner);
-        usernamePrice = _amount;
-    }
-
-    function setUsername(string _name) public payable{
-        require(msg.value >= usernamePrice);
+    function setUsername(address _user, string _name) public payable{
+        require(msg.sender == engine);
+        require(bytes(_name).length > 0);
         // username must be unique and should not be taken
         require(getAddressByUsername(_name) == address(0));
-        uint256 userId = userIds[msg.sender];
 
-        // must be existing user;
-        require(userId > 0);
+        uint256 userId = userIds[_user];
+        if (userId == 0){
+            addNewUser(_user);
+            userId = userIds[_user];
+        }
 
         // store username setting
         users[userId].name = _name;
@@ -459,13 +455,15 @@ contract SnowballEngine is TakesEther {
     address public gold;
     address public base;
 
+    uint256 public usernamePrice = 0;
     uint256 public throwPrice = 0;
     uint256 public minBalance = 1 finney;
     uint256 public maxBalls = 1024;
     uint256 public maxGold = 512;
     uint256 public newPlayerBonus = 3;
+    uint256 public usernameBonus = 3;
     uint16 public minGoldLevel = 2;
-    uint256 public freezeTime = 30 minutes;
+    uint256 public freezeTime = 15 minutes;
     bool public active = true;
 
     function setDependencies(address _balls,
@@ -485,6 +483,16 @@ contract SnowballEngine is TakesEther {
         freezeTime = _time;
         minGoldLevel = _exp;
         newPlayerBonus = _bonus;
+    }
+
+    function setUsernameBonus(uint256 _bonus) public {
+        require(msg.sender == owner);
+        usernameBonus = _bonus;
+    }
+
+    function setUsernamePrice(uint256 _amount) public{
+        require(msg.sender == owner);
+        usernamePrice = _amount;
     }
 
     function setThrowPrice(uint256 _price) public {
@@ -509,6 +517,7 @@ contract SnowballEngine is TakesEther {
     function throwBall(address _enemy) public payable{
         require(active);
         require(_enemy != msg.sender);
+        require(msg.sender.balance >= minBalance);
         require(msg.value >= throwPrice);
 
         SnowballUserbase userbase = SnowballUserbase(base);
@@ -523,7 +532,6 @@ contract SnowballEngine is TakesEther {
         uint256 enemyLastHit = 0;
 
         require(noFreeze(userLastHit));
-        require(msg.sender.balance >= minBalance);
         require(snowballs.throwBall(msg.sender, _enemy));
 
         if (userId == 0){
@@ -551,6 +559,17 @@ contract SnowballEngine is TakesEther {
 
             newGoldAndBalls(userLevel, enemyLastHit);
         }
+    }
+
+    function setUsername(string _name) public payable{
+        require(msg.sender.balance >= minBalance);
+        require(msg.value >= usernamePrice);
+
+        SnowballUserbase userbase = SnowballUserbase(base);
+        Snowballs snowballs = Snowballs(balls);
+
+        userbase.setUsername(msg.sender, _name);
+        snowballs.rollBalls(msg.sender, usernameBonus);
     }
 
     function newGoldAndBalls(uint16 _userLevel, uint256 _enemyLastHit) internal {
