@@ -579,7 +579,7 @@ contract SnowballEngine is TakesEther {
         }
     }
 
-     // Triggered legit hit are transferred.
+     // Triggered legit hit.
     event Hit(address indexed _from, address indexed _to);
 
 }
