@@ -8,7 +8,7 @@
     <meta name="description" content="">
     <meta name="author" content="">
 
-    <title>Ethereum Snowballs - Start The Fight</title>
+    <title>Ethereum Snowballs - Start The Fight!</title>
 
     <!-- Bootstrap core CSS -->
     <link href="website/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
@@ -43,9 +43,9 @@
             <li class="nav-item">
               <a class="nav-link js-scroll-trigger" href="#fight">Fight!</a>
             </li>
-            <!--<li class="nav-item">-->
-              <!--<a class="nav-link js-scroll-trigger" href="#about">About</a>-->
-            <!--</li>-->
+            <li class="nav-item">
+              <a class="nav-link js-scroll-trigger" href="#gameStats">Game Statistics</a>
+            </li>
             <!--<li class="nav-item">-->
               <!--<a class="nav-link js-scroll-trigger" href="#team">Team</a>-->
             <!--</li>-->
@@ -62,7 +62,7 @@
       <div class="container">
         <div class="intro-text">
           <div class="intro-lead-in">Ethereum Snowballs</div>
-          <div class="intro-heading text-uppercase">Start The Fight</div>
+          <div class="intro-heading text-uppercase">Start The Fight!</div>
           <a class="btn btn-primary btn-xl text-uppercase js-scroll-trigger" href="#about">Tell Me More</a>
         </div>
       </div>
@@ -173,8 +173,48 @@
             </a>
           </div>
         </div>
+
+        <div class="row" id="usernameSetter">
+          <div class="col-md-12 text-left">
+            <div class="text-muted text-left">
+              <h3><br><br><br><br><br><br>You can choose a username!</h3>
+            </div>
+          </div>
+
+          <div class="col-md-4 text-left">
+            <br>
+            <div class="input-group input-group-xs-10">
+              <input type="text" class="form-control" id="usernameField" value="Enter your username">
+            </div>
+          </div>
+          <div class="col-md-8 text-left">
+            <div>
+              <a class="btn btn-info btn-m" id="setUsername">
+                <i class="fa fa-3x fa-address-card text-primary sr-icons"></i>
+                <br>Pick Username
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
+
+    <section id="gameStats">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-12 text-center">
+            <h2 class="section-heading text-uppercase">Game Statistics</h2>
+            <h3 class="section-subheading text-muted">What's going on in the game?</h3>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-12 text-center text-muted" id="stats">
+        </div>
+      </div>
+
+    </section>
+
 
     <!--&lt;!&ndash; Portfolio Grid &ndash;&gt;-->
     <!--<section class="bg-light" id="portfolio">-->

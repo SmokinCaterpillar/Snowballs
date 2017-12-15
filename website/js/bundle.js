@@ -24,17 +24,22 @@ const baseABI = [{"constant":true,"inputs":[{"name":"_entry","type":"uint256"}],
 var base;
 
 const goldUnit = 100000000;
+const minTime = 0.5;
+const minBalance = 0.001;
+const defaultGasLimit = 555000;
 
 var withMeta;
 var metaUnlocked;
 var account;
+
+
 
 const nullAddress = "0x0000000000000000000000000000000000000000";
 
 var ballBalance = 'N/A';
 var level = 'N/A';
 var maxLevel = 'N/A';
-var lastHit = 'N/A';
+var lastHit = 0;
 var lastHitBy = 'N/A';
 var hitsTaken = 'N/A';
 var hitsGiven = 'N/A';
@@ -42,12 +47,13 @@ var goldBalance = 'N/A';
 var address = 'N/A';
 var userId = 'N/A';
 var username = 'N/A';
+var ethBalance = 'N/A';
 
 
 var enemyBallBalance = 'N/A';
 var enemyLevel = 'N/A';
 var enemyMaxLevel = 'N/A';
-var enemyLastHit = 'N/A';
+var enemyLastHit = 0;
 var enemyLastHitBy = 'N/A';
 var enemyHitsTaken = 'N/A';
 var enemyHitsGiven = 'N/A';
@@ -58,13 +64,23 @@ var enemyUsername = 'N/A';
 var enemyETHBalance = 'N/A';
 
 
+var totalUsers = 'N/A';
+var totalBalls = 'N/A';
+var totalGold = 'N/A';
+var totalHits = 'N/A';
+
+var levelLog = {};
+const nLevels = 10;
+var hitLog = {};
+const nHits = 10;
+
 ////////////////////////// UTILS ///////////////////////////////////////////
 
 function convertTimestamp(timestamp){
     var now = new BigNumber(Math.floor(Date.now() / 1000));
 
     var hoursAgo = now.minus(timestamp);
-    hoursAgo = hoursAgo.dividedBy(3600).round(1);
+    hoursAgo = hoursAgo.dividedBy(3600).round(2);
 
     return hoursAgo
 }
@@ -93,17 +109,34 @@ function startApp() {
 
     createContracts();
     listenForEnemyFindClicks();
+    listenForThrowClicks();
+    listenForNewUsernameClicks();
+    checkUser();
+    checkStats();
 
+
+}
+
+function checkStats(){
+    collectTotalBalls();
+    collectTotalGold();
+    collectTotalUsers();
+    collectTotalHits();
+    collectLeveLog();
+}
+
+function checkUser(){
     if (withMeta) {
-
         getAccount();
         if (metaUnlocked) {
             collectBallBalance();
             collectGoldBalance();
+            collectEthBlance();
         }
         collectUserInfo();
+    } else {
+        metaUnlocked = false;
     }
-
 }
 
 
@@ -111,10 +144,13 @@ function listenForEnemyFindClicks() {
   var button = document.getElementById('findButton');
   button.addEventListener('click', function() {
 
+      checkUser();
+      checkStats();
+
       var enemy = document.getElementById("enemyID").value;
 
       console.log('Clicked info about enemy ' +  enemy);
-      var isAddress = enemy.startsWith('0x')
+      var isAddress = enemy.startsWith('0x');
       if (isAddress){
           enemyAccount = enemy;
           collectEnemyInfo();
@@ -133,8 +169,76 @@ function listenForEnemyFindClicks() {
   })
 }
 
+
+function listenForThrowClicks() {
+  var button = document.getElementById('throwBall');
+  button.addEventListener('click', function() {
+      if (metaUnlocked) {
+          var lastHitinH = convertTimestamp(lastHit);
+
+          if (lastHitinH <= minTime){
+              alert('You are still paralzed from the last Hit wait some time!')
+          } else if (ballBalance === 0){
+              alert('You do not own a single Snowball!')
+          } else if (ethBalance < minBalance){
+              alert('You have insufficient ETH funds to participate!')
+          } else if (enemyAccount === 'N/A') {
+              alert('Plese search for a target enemy before throwing')
+          } else if (enemyAccount == account){
+              alert('You cannot hit yourself? What is wrong with you?')
+          } else {
+              console.log('Throwing at ' + enemyAccount);
+              engine.throwBall(enemyAccount, {
+                  from: account,
+                  gas: defaultGasLimit
+              }).then(function (txHash) {
+                  console.log('Transaction sent');
+                  console.dir(txHash);
+              });
+          }
+      } else {
+          alert('Please install and/or unlock MetaMask!')
+      }
+
+  })
+}
+
+function listenForNewUsernameClicks() {
+  var button = document.getElementById('setUsername');
+  button.addEventListener('click', function() {
+      if (metaUnlocked) {
+          var newUsername = document.getElementById("usernameField").value;
+
+          if (newUsername == ''){
+              alert('Your username cannot be empty');
+          } else {
+              base.getAddressByUsername(newUsername).then(function (results){
+                  var foundUser = results[0];
+                  console.log('Username found for ' + foundUser);
+
+                  if (foundUser != nullAddress){
+                      alert('Sorry username already taken!')
+                  } else {
+                      engine.setUsername(newUsername, {
+                          from: account,
+                          gas: defaultGasLimit / 2
+                      }).then(function (txHash) {
+                          console.log('Transaction sent');
+                          console.dir(txHash);
+                      });
+                  }
+              })
+          }
+      } else {
+          alert('Please install and/or unlock MetaMask!')
+      }
+
+  })
+}
+
 function getAccount(){
     account = web3.eth.coinbase;
+    console.log('Found user account ' + account)
     if (account === null){
         metaUnlocked = false;
     } else {
@@ -168,6 +272,69 @@ function collectGoldBalance(){
 }
 
 
+function collectTotalUsers(){
+    base.nUsers().then(function (results){
+        totalUsers = results[0];
+        console.log('totalUsers ' + totalUsers);
+        updateUI();
+
+    }).catch(function (error) {
+        console.log(error);
+    })
+}
+
+
+function collectTotalBalls(){
+    balls.totalSupply().then(function (results){
+        totalBalls = results[0];
+        console.log('totalBalls ' + totalBalls);
+        updateUI();
+
+    }).catch(function (error) {
+        console.log(error);
+    })
+}
+
+
+function collectTotalGold(){
+    gold.totalSupply().then(function (results){
+        totalGold = results[0];
+        totalGold = new BigNumber(totalGold).dividedBy(goldUnit);
+        console.log('totalGold ' + totalGold);
+        updateUI();
+
+    }).catch(function (error) {
+        console.log(error);
+    })
+}
+
+function collectTotalHits(){
+    base.totalHits().then(function (results){
+        totalHits = results[0];
+        totalHits = new BigNumber(totalHits);
+        console.log('totalHits ' + totalHits);
+        updateUI();
+        collectHitLog();
+
+    }).catch(function (error) {
+        console.log(error);
+    })
+}
+
+function collectEthBlance(){
+    web3.eth.getBalance(account, function (error, result) {
+        if (!error) {
+            ethBalance = web3.fromWei(result, 'ether');
+            ethBalance = new BigNumber(ethBalance).round(5);
+            console.log('ETH balance ' + ethBalance);
+            updateUI();
+        } else {
+            console.error(error);
+        }
+    })
+}
+
+
 function collectEnemyBallBalance(){
     balls.balanceOf(enemyAccount).then(function (results){
         enemyBallBalance = results[0];
@@ -193,16 +360,21 @@ function collectEnemyGoldBalance(){
 
 
 function collectEnemyEthBlance(){
-    web3.eth.getBalance(enemyAccount, function (error, result) {
-    if (!error) {
-      enemyETHBalance = web3.fromWei(result, 'ether');
-      enemyETHBalance = new BigNumber(enemyETHBalance).round(5);
-      console.log('enemy ETH balance ' + enemyETHBalance);
-      updateUI();
-    } else {
-      console.error(error);
+    try  {
+        web3.eth.getBalance(enemyAccount, function (error, result) {
+            if (!error) {
+                enemyETHBalance = web3.fromWei(result, 'ether');
+                enemyETHBalance = new BigNumber(enemyETHBalance).round(5);
+                console.log('enemy ETH balance ' + enemyETHBalance);
+                updateUI();
+            } else {
+                console.error(error);
+            }
+        })
+    } catch(err){
+        console.log(err);
+        alert('Invalid enemy address!');
     }
-  })
 }
 
 
@@ -244,6 +416,8 @@ function collectUserInfo(){
 
 
 function collectEnemyInfo(){
+    console.log('Looking for ' + enemyAccount);
+
      collectEnemyBallBalance();
      collectEnemyEthBlance();
      collectEnemyGoldBalance();
@@ -255,19 +429,19 @@ function collectEnemyInfo(){
          base.getUsername(enemyUserId).then(function (results) {
              enemyUsername = results[0];
              console.log('enemyUsername ' + username);
-             base.getFullUserInfo(userId).then(function (results) {
+             base.getFullUserInfo(enemyUserId).then(function (results) {
                  enemyLevel = results[1];
-                 console.log('enemyLevel ' + level);
+                 console.log('enemyLevel ' + enemyLevel);
                  enemyMaxLevel = results[2];
-                 console.log('enemyMaxLevel ' + level);
+                 console.log('enemyMaxLevel ' + enemyMaxLevel);
                  enemyLastHit = results[3];
-                 console.log('enemyLastHit ' + lastHit);
+                 console.log('enemyLastHit ' + enemyLastHit);
                  enemyLastHitBy = results[4];
-                 console.log('enemyLastHitBy ' + lastHitBy);
+                 console.log('enemyLastHitBy ' + enemyLastHitBy);
                  enemyHitsTaken = results[5];
-                 console.log('enemyHitsTaken ' + hitsTaken);
+                 console.log('enemyHitsTaken ' + enemyHitsTaken);
                  enemyHitsGiven = results[6];
-                 console.log('enemyHitsGiven ' + hitsGiven);
+                 console.log('enemyHitsGiven ' + enemyHitsGiven);
 
                  updateUI();
              });
@@ -276,9 +450,95 @@ function collectEnemyInfo(){
 }
 
 
+function accessLevelLogEntry(idx){
+    levelLog[idx] = 0;
+    base.getLevelLogEntry(idx).then(function (results){
+        var entry = results[0]
+        console.log('Found level log entry ' + idx + ' ' + entry)
+        levelLog[idx] = entry
+        updateUI();
+    })
+}
+
+
+function collectLeveLog(){
+    for (var irun = 0; irun < nLevels; irun++){
+        accessLevelLogEntry(irun);
+    }
+}
+
+function addUserLogEntry(userId, idx, logidx){
+    base.getUsername(userId).then(function (results){
+        var thename = results[0]
+        if (thename == ''){
+            base.getAddressById(userId).then(function (results){
+                var theaddress = results[0];
+                hitLog[idx][logidx] = theaddress;
+                updateUI();
+            })
+        } else {
+            hitLog[idx][logidx] = thename;
+            updateUI();
+        }
+    })
+}
+
+
+function accessHitLogEntry(idx){
+    hitLog[idx] = ['TBA', 'TBA'];
+    base.getHitLogEntry(idx).then(function (results){
+        var from = results[0];
+        var to = results[1];
+        console.log('Found hit log entry ' + idx + ' ' + from + ' ' + to);
+        addUserLogEntry(from, idx, 0);
+        addUserLogEntry(to, idx, 1);
+    })
+}
+
+
+function collectHitLog(){
+    console.log('Searching hitlog!');
+    for (var irun = 0; irun < nHits; irun++){
+        var tocheck = totalHits.minus(irun);
+        if (tocheck <= 0){
+            break;
+        }
+        accessHitLogEntry(tocheck);
+    }
+}
+
+
 function updateUI(){
     updateUserData();
     updateEnemyData();
+    updateStats();
+}
+
+function updateStats(){
+    var statsData = document.getElementById('stats');
+
+    var htmlText = 'Total players: ' + totalUsers + '<br>' +
+                   'Total hits: ' + totalHits + '<br>' +
+                   'Total Snowball supply: ' + totalBalls + '<br>' +
+                   'Total Gold supply: ' + totalGold + '<br><br>' +
+                    '<h5>Level Statistics</h5>';
+
+    for (var irun = 0; irun < nLevels; irun++) {
+        htmlText += 'Level ' + irun +' players: ' + levelLog[irun] +'<br>'
+        if (levelLog[irun] == 0){
+            break;
+        }
+    }
+
+    htmlText += '<br><h5>Recent Snowball Hits</h5>';
+
+    for (var irun = 0; irun < nHits; irun++) {
+        if (irun in hitLog) {
+            htmlText += hitLog[irun][0] + ' hit ' + hitLog[irun][1] + '<br>';
+        }
+    }
+
+    statsData.innerHTML = htmlText;
 }
 
 
@@ -292,14 +552,19 @@ function updateUserData(){
         htmlText = 'Hello <b>' + username + '</b> your level is <b>' + level +
              '</b><br><br>' + 'You own <b>' + ballBalance +
             ' Snowballs</b> and <b>' + goldBalance + ' SnowGold</b> <br><br>' +
-            'You hit <b>' + hitsGiven + ' enemys</b> and took <b>' + hitsTaken + ' hits</b>';
+            'You hit <b>' + hitsGiven + ' enemys</b> and took <b>' + hitsTaken + ' hits</b><br>';
 
         if (lastHit != 0) {
-            htmlText += '(last time is ' + lastHitinH + 'h ago)';
+            htmlText += '(last time was ' + lastHitinH + 'h ago)<br>';
         }
     }
 
     userData.innerHTML = htmlText;
+
+    if (username !== 'N/A' && username !== ''){
+        document.getElementById('usernameSetter').innerHTML = '';
+        console.log('Removed username register!')
+    }
 }
 
 
@@ -307,21 +572,33 @@ function updateEnemyData(){
     var userData = document.getElementById('enemyData');
     var htmlText;
 
-    if (enemyAccount != null) {
+    if (enemyAccount !== 'N/A') {
         var lastHitinH;
 
         if (enemyLastHit !== 'N/A') {
             lastHitinH = convertTimestamp(enemyLastHit);
         }
 
-        htmlText = 'Your enemy has level <b>' + level +
-            '</b><br><br>' + 'He owns <b>' + ballBalance +
-            ' Snowballs</b> and <b>' + goldBalance + ' SnowGold</b> and <b>' +
+        htmlText = 'Your enemy has level <b>' + enemyLevel +
+            '</b><br><br>' + 'She or he owns <b>' + enemyBallBalance +
+            ' Snowballs</b> and <b>' + enemyGoldBalance + ' SnowGold</b> and <b>' +
             enemyETHBalance + ' ETH</b><br><br>' +
-            'She or he hit <b>' + hitsGiven + ' other enemys</b> and took <b>' + hitsTaken + ' hits</b>';
+            'She or he hit <b>' + enemyHitsGiven + ' other enemys</b> and took <b>' + enemyHitsTaken + ' hits</b><br>';
 
         if (enemyLastHit != 0) {
-            htmlText += '(last time is ' + lastHitinH + 'h ago)';
+            htmlText += '(last time was ' + lastHitinH + 'h ago)<br>';
+        }
+
+        if (lastHitinH <= minTime){
+            htmlText += '<br> <b>Warning</b>: Your enemy is still paralyzed!';
+        }
+
+        if (enemyETHBalance < minBalance){
+            htmlText += '<br> <b>Warning</b>: Your enemy has insufficient ETH to participate!';
+        }
+
+        if (level !== 'N/A' && enemyLevel < level){
+            htmlText += '<br> <b>Warning</b>: Your enemy has a lower level than you!';
         }
 
         enemyData.innerHTML = htmlText;
