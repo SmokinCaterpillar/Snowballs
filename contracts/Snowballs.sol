@@ -464,7 +464,7 @@ contract SnowballEngine is TakesEther {
     uint256 public throwPrice = 0;
     uint256 public minBalance = 1 finney;
     uint256 public maxBalls = 1024;
-    uint256 public maxGold = 512;
+    uint256 public maxGold = 128;
     uint256 public newPlayerBonus = 3;
     uint256 public usernameBonus = 3;
     uint16 public minGoldLevel = 2;

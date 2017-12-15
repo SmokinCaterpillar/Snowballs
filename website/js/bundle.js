@@ -209,8 +209,10 @@ function listenForNewUsernameClicks() {
       if (metaUnlocked) {
           var newUsername = document.getElementById("usernameField").value;
 
-          if (newUsername == ''){
+          if (newUsername == '') {
               alert('Your username cannot be empty');
+          } else if (ethBalance < minBalance){
+              alert('Your account has insufficient funds to participate!');
           } else {
               base.getAddressByUsername(newUsername).then(function (results){
                   var foundUser = results[0];
