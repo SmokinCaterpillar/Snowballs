@@ -411,7 +411,7 @@ contract SnowballUserbase is HasEngine{
     }
 
     // Adds a hit, i.e. a throw `_by` hitting `_to`
-    function addHit(uint256 _by, uint256 _to) public{
+    function addHit(uint256 _by, uint256 _to, uint16 _loss) public{
         require(msg.sender == engine);
         uint16 oldLevel;
         uint16 newLevel;
@@ -423,7 +423,12 @@ contract SnowballUserbase is HasEngine{
         totalHits += 1;
 
         oldLevel = users[_to].level;
-        changeLevelLog(_to, oldLevel, 0);
+        newLevel = oldLevel - _loss;
+        if (newLevel > oldLevel){
+            // wrap around
+            newLevel = 0;
+        }
+        changeLevelLog(_to, oldLevel, newLevel);
 
         oldLevel = users[_by].level;
         newLevel = oldLevel + 1;
@@ -463,7 +468,8 @@ contract SnowballEngine is TakesEther {
     uint256 public newPlayerBonus = 3;
     uint256 public usernameBonus = 3;
     uint16 public minGoldLevel = 2;
-    uint256 public freezeTime = 15 minutes;
+    uint16 public levelLoss = 2;
+    uint256 public freezeTime = 30 minutes;
     bool public active = true;
 
     function setDependencies(address _balls,
@@ -476,13 +482,15 @@ contract SnowballEngine is TakesEther {
     }
 
     function setRules(uint256 _time, uint256 _balls,
-                      uint256 _gold, uint16 _exp, uint256 _bonus) public {
+                      uint256 _gold, uint16 _exp, uint256 _bonus,
+                      uint16 _loss) public {
         require(msg.sender == owner);
         maxGold = _gold;
         maxBalls = _balls;
         freezeTime = _time;
         minGoldLevel = _exp;
         newPlayerBonus = _bonus;
+        levelLoss = _loss;
     }
 
     function setUsernameBonus(uint256 _bonus) public {
@@ -555,7 +563,7 @@ contract SnowballEngine is TakesEther {
                 (_enemy.balance >= minBalance)){
             // throw counts
             Hit(msg.sender, _enemy);
-            userbase.addHit(userId, enemyId);
+            userbase.addHit(userId, enemyId, levelLoss);
 
             newGoldAndBalls(userLevel, enemyLastHit);
         }

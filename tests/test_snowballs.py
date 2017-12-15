@@ -42,7 +42,7 @@ def deploy_all_the_stuff(chain):
 
 
 def set_debug_settings(chain, engine):
-    chain.wait.for_receipt(engine.transact().setRules(40, 4, 2, 1, 3))
+    chain.wait.for_receipt(engine.transact().setRules(40, 4, 2, 1, 3, 1))
     chain.wait.for_receipt(engine.transact().setMinBalance(1*finney))
 
 
@@ -341,6 +341,15 @@ def testLevelUp(chain, accounts):
     assert gold.call().balanceOf(accounts[0]) == dev_gold + 1 * gold_unit
     assert gold.call().totalSupply() == dev_gold + 1 * gold_unit
 
+    for irun in range(5):
+        chain.wait.for_receipt(base.transact().getFullUserInfo(1))
+
+    stuff = chain.wait.for_receipt(engine.transact({'from': accounts[3]}).throwBall(accounts[0]))
+
+    assert base.call().getLevelLogEntry(0) == 1
+    assert base.call().getLevelLogEntry(1) == 3
+    assert base.call().getLevelLogEntry(2) == 0
+
 
 def test_ownership_transfer(chain, accounts):
 
@@ -549,7 +558,7 @@ def test_security(chain, accounts):
         chain.wait.for_receipt(base.transact({'from': accounts[1]}).addNewUser(accounts[1]))
 
     with pytest.raises(TransactionFailed):
-        chain.wait.for_receipt(base.transact({'from': accounts[1]}).addHit(2,3))
+        chain.wait.for_receipt(base.transact({'from': accounts[1]}).addHit(2,3,1))
 
     with pytest.raises(TransactionFailed):
         chain.wait.for_receipt(engine.transact({'from': accounts[1]}).setGameState(True))
